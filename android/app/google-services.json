@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "345599189794",
+    "project_id": "urbanleafs-5a71b",
+    "storage_bucket": "urbanleafs-5a71b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:345599189794:android:ea160fa28bb620f7553b7b",
+        "android_client_info": {
+          "package_name": "com.abhishek.urbanleafs"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWAblHJrDreYdA-4vD1fh-cs95LGOtvJI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
