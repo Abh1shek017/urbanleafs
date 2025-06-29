@@ -31,7 +31,9 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     final end = DateTime(selectedYear, monthIndex + 1, 0, 23, 59, 59);
     ref
         .read(balanceSheetViewModelProvider.notifier)
-        .loadData(range: DateTimeRange(start: start, end: end));
+        .loadData(
+          range: DateTimeRange(start: start, end: end),
+        );
   }
 
   void _loadDataForCustom(DateTimeRange range) {
@@ -78,8 +80,12 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
               onChanged: (val) {
                 if (val != null) {
                   final now = DateTime.now();
-                  final selectedMonthIndex = DateFormat('MMMM').parse(val).month;
-                  if (selectedYear == now.year && selectedMonthIndex > now.month) return;
+                  final selectedMonthIndex = DateFormat(
+                    'MMMM',
+                  ).parse(val).month;
+                  if (selectedYear == now.year &&
+                      selectedMonthIndex > now.month)
+                    return;
                   setState(() => selectedMonth = val);
                   _loadDataForCurrentMonth();
                 }
@@ -96,9 +102,13 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             onChanged: (val) {
               if (val != null) {
                 final now = DateTime.now();
-                final selectedMonthIndex = DateFormat('MMMM').parse(selectedMonth).month;
+                final selectedMonthIndex = DateFormat(
+                  'MMMM',
+                ).parse(selectedMonth).month;
                 if (val == now.year && selectedMonthIndex > now.month) {
-                  setState(() => selectedMonth = DateFormat('MMMM').format(now));
+                  setState(
+                    () => selectedMonth = DateFormat('MMMM').format(now),
+                  );
                 }
                 setState(() => selectedYear = val);
                 _loadDataForCurrentMonth();
@@ -135,27 +145,62 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         children: [
-          _buildSummaryCard('Total Sold', '₹${state.totalSold.toStringAsFixed(2)}', Colors.green[100]!, () {
-            _showTotalSoldDetails(context);
-          }),
-          _buildSummaryCard('Total Expenses', '₹${state.totalExpenses.toStringAsFixed(2)}', Colors.red[100]!, () {
-            _showTotalExpensesDetails(context);
-          }),
-          _buildSummaryCard('Total Profit', '₹${state.totalProfit.toStringAsFixed(2)}', Colors.blue[100]!, () {
-            _showProfitDetails(context, state.totalSold, state.totalExpenses, state.totalProfit);
-          }),
-          _buildSummaryCard('Due Amounts', '₹${state.dueAmounts.toStringAsFixed(2)}', Colors.orange[100]!, () {
-            _showDueAmountsDetails(context);
-          }),
-          _buildSummaryCard('Raw Purchases', '₹${state.rawPurchases.toStringAsFixed(2)}', Colors.grey[300]!, () {
-            _showRawPurchasesDetails(context);
-          }),
+          _buildSummaryCard(
+            'Total Sold',
+            '₹${state.totalSold.toStringAsFixed(2)}',
+            Colors.green[100]!,
+            () {
+              _showTotalSoldDetails(context);
+            },
+          ),
+          _buildSummaryCard(
+            'Total Expenses',
+            '₹${state.totalExpenses.toStringAsFixed(2)}',
+            Colors.red[100]!,
+            () {
+              _showTotalExpensesDetails(context);
+            },
+          ),
+          _buildSummaryCard(
+            'Total Profit',
+            '₹${state.totalProfit.toStringAsFixed(2)}',
+            Colors.blue[100]!,
+            () {
+              _showProfitDetails(
+                context,
+                state.totalSold,
+                state.totalExpenses,
+                state.totalProfit,
+              );
+            },
+          ),
+          _buildSummaryCard(
+            'Due Amounts',
+            '₹${state.dueAmounts.toStringAsFixed(2)}',
+            Colors.orange[100]!,
+            () {
+              _showDueAmountsDetails(context);
+            },
+          ),
+          _buildSummaryCard(
+            'Raw Purchases',
+            '₹${state.rawPurchases.toStringAsFixed(2)}',
+            Colors.grey[300]!,
+            () {
+              _showRawPurchasesDetails(context);
+            },
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCard(String title, String amount, Color color, VoidCallback onTap) {
+  Widget _buildSummaryCard(
+    String title,
+    String amount,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -165,12 +210,21 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(2, 2))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 4,
+              offset: const Offset(2, 2),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
             const SizedBox(height: 6),
             Text(amount, style: const TextStyle(fontSize: 16)),
           ],
@@ -181,7 +235,9 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
 
   Widget _buildTransactionList(List<ExpenseModel> expenses) {
     if (expenses.isEmpty) {
-      return const Center(child: Text('No transactions found for this period.'));
+      return const Center(
+        child: Text('No transactions found for this period.'),
+      );
     }
     return ListView.builder(
       itemCount: expenses.length,
@@ -194,11 +250,17 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             duration: const Duration(milliseconds: 200),
             margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(exp.description, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  exp.description,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Text('₹${exp.amount.toStringAsFixed(2)}'),
                 Text('Type: ${exp.type}'),
                 Text('Added: ${dateFormat.format(exp.addedAt)}'),
@@ -237,7 +299,12 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             Text('Added: ${dateFormat.format(exp.addedAt)}'),
           ],
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
@@ -274,15 +341,24 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
               Expanded(
                 child: data.isEmpty
-                    ? const Center(child: Text('No records found for this period.'))
+                    ? const Center(
+                        child: Text('No records found for this period.'),
+                      )
                     : ListView.builder(
                         controller: scrollController,
                         itemCount: data.length,
-                        itemBuilder: (context, index) => itemBuilder(data[index]),
+                        itemBuilder: (context, index) =>
+                            itemBuilder(data[index]),
                       ),
               ),
             ],
@@ -312,11 +388,16 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     }).toList();
   }
 
-  Future<List<Map<String, dynamic>>> _fetchExpensesForPeriod({String? filterType}) async {
+  Future<List<Map<String, dynamic>>> _fetchExpensesForPeriod({
+    String? filterType,
+  }) async {
     final range = _getSelectedRange();
     Query q = FirebaseFirestore.instance
         .collection('expenses')
-        .where('addedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
+        .where(
+          'addedAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(range.start),
+        )
         .where('addedAt', isLessThanOrEqualTo: Timestamp.fromDate(range.end));
     if (filterType != null) q = q.where('type', isEqualTo: filterType);
 
@@ -361,58 +442,87 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
   // 🔥 each detail method
   void _showTotalSoldDetails(BuildContext context) async {
     final orders = await _fetchOrdersForPeriod();
-    _showDataSheet(context, 'Total Sold Details', orders, (order) {
-      return ListTile(
-        title: Text('₹${order['amount'].toStringAsFixed(2)}'),
-        subtitle: Text('Customer: ${order['customer']}\nDate: ${dateFormat.format(order['date'])}'),
-        trailing: Text('#${order['id'].substring(0, 6)}'),
-      );
-    });
+    if (context.mounted) {
+      _showDataSheet(context, 'Total Sold Details', orders, (order) {
+        return ListTile(
+          title: Text('₹${order['amount'].toStringAsFixed(2)}'),
+          subtitle: Text(
+            'Customer: ${order['customer']}\nDate: ${dateFormat.format(order['date'])}',
+          ),
+          trailing: Text('#${order['id'].substring(0, 6)}'),
+        );
+      });
+    }
   }
 
   void _showTotalExpensesDetails(BuildContext context) async {
     final expenses = await _fetchExpensesForPeriod();
-    _showDataSheet(context, 'Total Expenses Details', expenses, (exp) {
-      return ListTile(
-        title: Text(exp['description']),
-        subtitle: Text('₹${exp['amount'].toStringAsFixed(2)}\nType: ${exp['type']}\nDate: ${dateFormat.format(exp['addedAt'])}'),
-      );
-    });
+    if (context.mounted) {
+      _showDataSheet(context, 'Total Expenses Details', expenses, (exp) {
+        return ListTile(
+          title: Text(exp['description']),
+          subtitle: Text(
+            '₹${exp['amount'].toStringAsFixed(2)}\nType: ${exp['type']}\nDate: ${dateFormat.format(exp['addedAt'])}',
+          ),
+        );
+      });
+    }
   }
 
-  void _showProfitDetails(BuildContext context, double sold, double expenses, double profit) {
-    _showDataSheet(context, 'Profit Calculation', [
-      {'sold': sold, 'expenses': expenses, 'profit': profit}
-    ], (data) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Total Sold: ₹${sold.toStringAsFixed(2)}'),
-          Text('Total Expenses: ₹${expenses.toStringAsFixed(2)}'),
-          const Divider(),
-          Text('Total Profit: ₹${profit.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      );
-    });
+  void _showProfitDetails(
+    BuildContext context,
+    double sold,
+    double expenses,
+    double profit,
+  ) {
+    _showDataSheet(
+      context,
+      'Profit Calculation',
+      [
+        {'sold': sold, 'expenses': expenses, 'profit': profit},
+      ],
+      (data) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Total Sold: ₹${sold.toStringAsFixed(2)}'),
+            Text('Total Expenses: ₹${expenses.toStringAsFixed(2)}'),
+            const Divider(),
+            Text(
+              'Total Profit: ₹${profit.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showDueAmountsDetails(BuildContext context) async {
     final dues = await _fetchDueOrdersForPeriod();
-    _showDataSheet(context, 'Due Amounts Details', dues, (order) {
-      return ListTile(
-        title: Text('₹${order['dueAmount'].toStringAsFixed(2)}'),
-        subtitle: Text('Customer: ${order['customer']}\nDate: ${dateFormat.format(order['date'])}'),
-      );
-    });
+    if (context.mounted) {
+      _showDataSheet(context, 'Due Amounts Details', dues, (order) {
+        return ListTile(
+          title: Text('₹${order['dueAmount'].toStringAsFixed(2)}'),
+          subtitle: Text(
+            'Customer: ${order['customer']}\nDate: ${dateFormat.format(order['date'])}',
+          ),
+        );
+      });
+    }
   }
 
   void _showRawPurchasesDetails(BuildContext context) async {
     final expenses = await _fetchExpensesForPeriod(filterType: 'rawMaterial');
-    _showDataSheet(context, 'Raw Purchases Details', expenses, (exp) {
-      return ListTile(
-        title: Text(exp['description']),
-        subtitle: Text('₹${exp['amount'].toStringAsFixed(2)}\nDate: ${dateFormat.format(exp['addedAt'])}'),
-      );
-    });
+    if (context.mounted) {
+      _showDataSheet(context, 'Raw Purchases Details', expenses, (exp) {
+        return ListTile(
+          title: Text(exp['description']),
+          subtitle: Text(
+            '₹${exp['amount'].toStringAsFixed(2)}\nDate: ${dateFormat.format(exp['addedAt'])}',
+          ),
+        );
+      });
+    }
   }
 }

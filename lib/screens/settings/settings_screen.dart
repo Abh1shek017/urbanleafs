@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -6,28 +7,28 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Settings")),
+      appBar: AppBar(title: const Text("Settings")),
       body: ListView(
         children: [
           ListTile(
-            title: Text("General Settings"),
-            onTap: () => Navigator.pushNamed(context, '/settings/general'),
+            title: const Text("General Settings"),
+            onTap: () => context.pushNamed('general_settings'),
           ),
           ListTile(
-            title: Text("Notifications"),
-            onTap: () => Navigator.pushNamed(context, '/settings/notifications'),
+            title: const Text("Notifications"),
+            onTap: () => context.pushNamed('notifications'),
           ),
           ListTile(
-            title: Text("Privacy Settings"),
-            onTap: () => Navigator.pushNamed(context, '/settings/privacy'),
+            title: const Text("Privacy Settings"),
+            onTap: () => context.pushNamed('privacy_settings'),
           ),
           ListTile(
-            title: Text("Language Selection"),
-            onTap: () => Navigator.pushNamed(context, '/settings/language'),
+            title: const Text("Language Selection"),
+            onTap: () => context.pushNamed('language_selection'),
           ),
           ListTile(
-            title: Text("Appearance"),
-            onTap: () => Navigator.pushNamed(context, '/settings/appearance'),
+            title: const Text("Appearance"),
+            onTap: () => context.pushNamed('appearance_settings'),
           ),
         ],
       ),

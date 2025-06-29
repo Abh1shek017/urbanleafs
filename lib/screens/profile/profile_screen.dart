@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:urbanleafs/providers/auth_provider.dart';
-// import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -22,52 +22,62 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final userAsync = ref.watch(currentUserStreamProvider);
 
     return userAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text("Error: $err")),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) => Scaffold(body: Center(child: Text("Error: $err"))),
       data: (user) {
         if (user == null) {
-          return const Center(child: Text("User not found"));
+          return const Scaffold(body: Center(child: Text("User not found")));
         }
+
+        final username = user.username;
+        final roleName = user.role.name;
 
         return Scaffold(
           appBar: AppBar(title: const Text("Profile")),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              ListTile(
-                leading: CircleAvatar(
-                  child: Text(user.username[0].toUpperCase()),
+          body: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue.shade200,
+                    child: Text(
+                      username.isNotEmpty ? username[0].toUpperCase() : "U",
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  title: Text(username),
+                  subtitle: Text("Role: $roleName"),
                 ),
-                title: Text(user.username),
-                subtitle: Text("Role: ${user.role.name}"),
-              ),
-              const Divider(),
-              ListTile(
-                title: const Text("Edit Profile"),
-                onTap: () => Navigator.pushNamed(context, '/profile/edit'),
-              ),
-              ListTile(
-                title: const Text("Change Password"),
-                onTap: () =>
-                    Navigator.pushNamed(context, '/profile/change-password'),
-              ),
-              ListTile(
-                title: const Text("Legal & Compliance"),
-                onTap: () => Navigator.pushNamed(context, '/legal'),
-              ),
-              ListTile(
-                title: const Text("About App"),
-                onTap: () => Navigator.pushNamed(context, '/legal/about'),
-              ),
-              ListTile(
-                title: const Text("Logout"),
-                trailing: const Icon(Icons.logout),
-                onTap: () {
-                  ref.read(authServiceProvider).logout();
-                  Navigator.pushReplacementNamed(context, '/login');
-                },
-              ),
-            ],
+                const SizedBox(height: 16),
+                const Divider(),
+                ListTile(
+                  title: const Text("Edit Profile"),
+                  onTap: () => context.go('/profile/edit'),
+                ),
+                ListTile(
+                  title: const Text("Change Password"),
+                  onTap: () => context.go('/profile/change-password'),
+                ),
+                ListTile(
+                  title: const Text("Legal & Compliance"),
+                  onTap: () => context.go('/legal'),
+                ),
+                ListTile(
+                  title: const Text("About App"),
+                  onTap: () => context.go('/legal/about'),
+                ),
+                ListTile(
+                  title: const Text("Logout"),
+                  trailing: const Icon(Icons.logout),
+                  onTap: () {
+                    ref.read(authServiceProvider).logout();
+                    context.go('/login');
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },

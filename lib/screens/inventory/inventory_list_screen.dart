@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../providers/inventory_provider.dart';
 import '../../widgets/inventory_item.dart';
@@ -20,9 +21,7 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
     final inventoryAsync = ref.watch(inventoryStreamProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Inventory"),
-      ),
+      appBar: AppBar(title: const Text("Inventory")),
       body: SafeArea(
         child: Column(
           children: [
@@ -61,19 +60,19 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
             // Inventory List
             Expanded(
               child: inventoryAsync.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (err, _) => Center(child: Text("Error: $err")),
                 data: (inventoryItems) {
                   final filteredItems = _selectedFilter == 'all'
                       ? inventoryItems
                       : inventoryItems
-                          .where((item) => item.type == _selectedFilter)
-                          .toList();
+                            .where((item) => item.type == _selectedFilter)
+                            .toList();
 
                   if (filteredItems.isEmpty) {
                     return const Center(
-                        child: Text("No inventory items found."));
+                      child: Text("No inventory items found."),
+                    );
                   }
 
                   return ListView.builder(
@@ -98,9 +97,7 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
 
       // Add New Inventory FAB
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/inventory/add');
-        },
+        onPressed: () => context.pushNamed('add_inventory'),
         child: const Icon(Icons.add),
       ),
     );

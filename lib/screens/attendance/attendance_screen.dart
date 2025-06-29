@@ -167,7 +167,7 @@ class AttendanceScreen extends ConsumerWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: _statusColor(record.status).withOpacity(0.2),
+                            color: _statusColor(record.status),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(

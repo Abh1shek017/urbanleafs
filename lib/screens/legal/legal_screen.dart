@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../widgets/legl_widget_item.dart';
 
 class LegalScreen extends StatelessWidget {
@@ -7,25 +8,20 @@ class LegalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Legal & Compliance")),
+      appBar: AppBar(title: const Text("Legal & Compliance")),
       body: ListView(
         children: [
-          LegalMenuItem(
-            title: "About This App",
-            subtitle: "Learn more about UrbanLeafs Paper Plate Manager",
-            onTap: () => Navigator.pushNamed(context, '/legal/about'),
+          ListTile(
+            title: const Text("About App"),
+            onTap: () => context.pushNamed('app_info'),
           ),
-          Divider(height: 1),
-          LegalMenuItem(
-            title: "Privacy Policy",
-            subtitle: "How we collect and protect your data",
-            onTap: () => Navigator.pushNamed(context, '/legal/privacy-policy'),
+          ListTile(
+            title: const Text("Privacy Policy"),
+            onTap: () => context.pushNamed('privacy_policy'),
           ),
-          Divider(height: 1),
-          LegalMenuItem(
-            title: "Terms of Service",
-            subtitle: "Rules and conditions for using this app",
-            onTap: () => Navigator.pushNamed(context, '/legal/terms-of-service'),
+          ListTile(
+            title: const Text("Terms of Service"),
+            onTap: () => context.pushNamed('terms_of_service'),
           ),
           Divider(height: 1),
           LegalMenuItem(
@@ -43,12 +39,14 @@ class LegalScreen extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: Text("Data Export"),
-        content: Text("You can export your data as JSON or CSV. This feature will be available in a future update."),
+        content: Text(
+          "You can export your data as JSON or CSV. This feature will be available in a future update.",
+        ),
         actions: [
           TextButton(
             onPressed: Navigator.of(context).pop,
             child: Text("Close"),
-          )
+          ),
         ],
       ),
     );

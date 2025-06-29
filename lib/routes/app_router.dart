@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../utils/go_router_refresh_stream.dart';
 
+// Screens
 import '../screens/auth/login_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/attendance/attendance_screen.dart';
@@ -14,6 +15,13 @@ import '../screens/balance_sheet/balance_sheet_screen.dart';
 import '../screens/inventory/inventory_screen.dart';
 import '../screens/orders/today_orders_screen.dart';
 import '../screens/payments/today_payments_screen.dart';
+
+// Profile
+import '../screens/profile/profile_screen.dart';
+import '../screens/profile/edit_profile_screen.dart';
+import '../screens/profile/change_password_screen.dart';
+
+// Settings
 import '../screens/settings/settings_screen.dart';
 import '../screens/settings/general_setting_screen.dart';
 import '../screens/settings/notifications_screen.dart';
@@ -21,12 +29,13 @@ import '../screens/settings/privacy_settings_screen.dart';
 import '../screens/settings/language_screen.dart';
 import '../screens/appearance/appearance_setting_screen.dart';
 import '../screens/settings/manage_users_screen.dart';
-import '../screens/profile/profile_screen.dart';
-import '../screens/profile/edit_profile_screen.dart';
-import '../screens/profile/change_password_screen.dart';
+
+// Support
 import '../screens/support/faq_screen.dart';
 import '../screens/support/feedback_screen.dart';
 import '../screens/support/contact_us_screen.dart';
+
+// Legal
 import '../screens/legal/legal_screen.dart';
 import '../screens/legal/app_info_screen.dart';
 import '../screens/legal/privacy_screen.dart';
@@ -37,7 +46,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/login',
-    // ignore: deprecated_member_use
     refreshListenable: GoRouterRefreshStream(
       ref.read(authServiceProvider).authState,
     ),
@@ -50,6 +58,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+
+      // Auth & Dashboard
       GoRoute(
         path: '/login',
         name: 'login',
@@ -60,6 +70,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'dashboard',
         builder: (context, state) => const DashboardScreen(),
       ),
+
+      // Core Modules
       GoRoute(
         path: '/attendance',
         name: 'attendance',
@@ -86,7 +98,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TodayPaymentsScreen(),
       ),
 
-      // Profile Routes
+      // Profile
       GoRoute(
         path: '/profile',
         name: 'profile',
@@ -103,7 +115,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ChangePasswordScreen(),
       ),
 
-      // Settings Routes
+      // Settings
       GoRoute(
         path: '/settings',
         name: 'settings',
@@ -135,7 +147,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AppearanceSettingsScreen(),
       ),
 
-      // Support Routes
+      // Support
       GoRoute(
         path: '/support',
         name: 'support',
@@ -157,7 +169,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ContactSupportScreen(),
       ),
 
-      // Legal Routes
+      // Legal
       GoRoute(
         path: '/legal',
         name: 'legal',
@@ -179,12 +191,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TermsOfServiceScreen(),
       ),
 
-      // Admin Only
+      // Admin only
       GoRoute(
         path: '/users',
         name: 'manage_users',
         redirect: (context, state) {
-          final currentUser = ref.watch(currentUserStreamProvider).value;
+          final currentUser = ref.read(currentUserStreamProvider).value;
           if (currentUser?.role.name != AppConstants.roleAdmin) {
             return '/profile';
           }

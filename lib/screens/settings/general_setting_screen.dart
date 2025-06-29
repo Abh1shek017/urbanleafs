@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/theme_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class GeneralSettingsScreen extends ConsumerStatefulWidget {
   const GeneralSettingsScreen({super.key});
 
   @override
-  ConsumerState<GeneralSettingsScreen> createState() => _GeneralSettingsScreenState();
+  ConsumerState<GeneralSettingsScreen> createState() =>
+      _GeneralSettingsScreenState();
 }
 
 class _GeneralSettingsScreenState extends ConsumerState<GeneralSettingsScreen>
@@ -42,20 +44,17 @@ class _GeneralSettingsScreenState extends ConsumerState<GeneralSettingsScreen>
             title: const Text("Language"),
             subtitle: const Text("English"),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () => Navigator.pushNamed(context, '/settings/language'),
+            onTap: () => context.pushNamed('language_selection'),
           ),
           const Divider(),
-          const ListTile(
-            title: Text("App Version"),
-            subtitle: Text("v1.0.0"),
-          ),
+          const ListTile(title: Text("App Version"), subtitle: Text("v1.0.0")),
           ListTile(
             title: const Text("Data Backup"),
             subtitle: const Text("Manual backup to Google Drive"),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Coming Soon")),
-            ),
+            onTap: () => ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text("Coming Soon"))),
           ),
         ],
       ),

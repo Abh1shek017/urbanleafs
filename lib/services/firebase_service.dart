@@ -25,4 +25,23 @@ class AuthService {
 
   // Logout
   Future<void> logout() => _auth.signOut();
+
+  // Change password
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('No user logged in');
+
+    // Re-authenticate user before changing password
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: currentPassword,
+    );
+    await user.reauthenticateWithCredential(credential);
+
+    // Change password
+    await user.updatePassword(newPassword);
+  }
 }
