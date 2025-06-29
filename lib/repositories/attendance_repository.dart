@@ -5,6 +5,8 @@ import 'package:flutter/material.dart'; // For DateUtils
 import 'package:urbanleafs/constants/app_constants.dart';
 import '../models/attendance_model.dart';
 import './base_repository.dart';
+import '../models/workers_summary_model.dart';
+import '../models/worker_model.dart';
 
 class AttendanceRepository extends BaseRepository {
   AttendanceRepository()
@@ -34,6 +36,64 @@ class AttendanceRepository extends BaseRepository {
               .map((doc) => AttendanceModel.fromSnapshot(doc))
               .toList(),
         );
+  }
+
+  Future<List<WorkerSummaryModel>> getWorkerSummaries({
+    required int month,
+    required int year,
+  }) async {
+    final start = DateTime(year, month, 1);
+    final end = DateTime(year, month + 1, 0, 23, 59, 59);
+
+    // First, get all active workers
+    final workersSnapshot = await FirebaseFirestore.instance
+        .collection('workers')
+        .where('isActive', isEqualTo: true)
+        .get();
+
+    final workers = workersSnapshot.docs
+        .map((doc) => WorkerModel.fromDoc(doc))
+        .toList();
+
+    // Then, get attendance records for the month
+    final attendanceSnapshot = await FirebaseFirestore.instance
+        .collection('attendance')
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .get();
+
+    final attendanceRecords = attendanceSnapshot.docs
+        .map((doc) => AttendanceModel.fromSnapshot(doc))
+        .toList();
+
+    // Create a map of worker data for quick lookup
+    final Map<String, WorkerModel> workerMap = {};
+    for (var worker in workers) {
+      workerMap[worker.id] = worker;
+    }
+
+    // Group attendance by userId
+    final Map<String, List<AttendanceModel>> attendanceByUser = {};
+    for (var record in attendanceRecords) {
+      attendanceByUser.putIfAbsent(record.userId, () => []).add(record);
+    }
+
+    // Build WorkerSummaryModel list
+    return workers.map((worker) {
+      final history = attendanceByUser[worker.id] ?? [];
+
+      final present = history.where((att) => att.status == 'present').length;
+      final absent = history.where((att) => att.status == 'absent').length;
+      final half = history.where((att) => att.status == 'halfDay').length;
+
+      return WorkerSummaryModel(
+        worker: worker,
+        presentDays: present,
+        absentDays: absent,
+        halfDays: half,
+        attendanceHistory: history,
+      );
+    }).toList();
   }
 
   /// 🔁 Stream: Count of today's attendance for a specific shift and Present only
