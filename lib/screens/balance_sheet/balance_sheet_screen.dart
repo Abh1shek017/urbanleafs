@@ -84,8 +84,9 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
                     'MMMM',
                   ).parse(val).month;
                   if (selectedYear == now.year &&
-                      selectedMonthIndex > now.month)
+                      selectedMonthIndex > now.month) {
                     return;
+                  }
                   setState(() => selectedMonth = val);
                   _loadDataForCurrentMonth();
                 }

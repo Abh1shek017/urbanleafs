@@ -39,38 +39,80 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.blue.shade200,
-                    child: Text(
-                      username.isNotEmpty ? username[0].toUpperCase() : "U",
-                      style: const TextStyle(color: Colors.white),
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.blue.shade300,
+                          child: Text(
+                            username.isNotEmpty ? username[0].toUpperCase() : "U",
+                            style: const TextStyle(
+                                fontSize: 24, color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              username,
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              "Role: $roleName",
+                              style: TextStyle(
+                                  color: Colors.grey.shade600, fontSize: 14),
+                            )
+                          ],
+                        )
+                      ],
                     ),
                   ),
-                  title: Text(username),
-                  subtitle: Text("Role: $roleName"),
                 ),
-                const SizedBox(height: 16),
-                const Divider(),
+                const SizedBox(height: 24),
+
+                // Settings options
                 ListTile(
+                  leading: const Icon(Icons.edit),
                   title: const Text("Edit Profile"),
+                  trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.go('/profile/edit'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.lock),
                   title: const Text("Change Password"),
+                  trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.go('/profile/change-password'),
                 ),
+                const Divider(height: 32),
+
                 ListTile(
+                  leading: const Icon(Icons.gavel),
                   title: const Text("Legal & Compliance"),
+                  trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.go('/legal'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.info),
                   title: const Text("About App"),
+                  trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.go('/legal/about'),
                 ),
+                const Divider(height: 32),
+
                 ListTile(
-                  title: const Text("Logout"),
-                  trailing: const Icon(Icons.logout),
+                  leading: const Icon(Icons.logout, color: Colors.red),
+                  title: const Text(
+                    "Logout",
+                    style: TextStyle(color: Colors.red),
+                  ),
                   onTap: () {
                     ref.read(authServiceProvider).logout();
                     context.go('/login');
