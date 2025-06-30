@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/inventory_model.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../providers/user_provider.dart';
+import '../../services/json_storage_service.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -17,8 +18,28 @@ class InventoryScreen extends ConsumerStatefulWidget {
 
 class _InventoryScreenState extends ConsumerState<InventoryScreen>
     with AutomaticKeepAliveClientMixin {
+  final JsonStorageService jsonStorage = JsonStorageService();
+  List<dynamic> itemNames = [];
+  List<dynamic> units = [];
+  List<dynamic> itemTypes = [];
+
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMasterData();
+  }
+
+  Future<void> _loadMasterData() async {
+    final data = await jsonStorage.getMasterData();
+    setState(() {
+      itemNames = data['inventoryTypes'] ?? [];
+      units = data['units'] ?? [];
+      itemTypes = data['itemTypes'] ?? [];
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +65,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
               final isLowStock = item.quantity < item.lowStockThreshold;
               final isRaw = item.type == 'raw';
 
-              final userNameAsync = ref.watch(userNameByIdProvider(item.updatedBy));
+              final userNameAsync = ref.watch(
+                userNameByIdProvider(item.updatedBy),
+              );
 
               return Card(
                 elevation: 3,
@@ -92,10 +115,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                   isThreeLine: true,
                   trailing: IconButton(
                     icon: const Icon(Icons.edit),
-                    onPressed: () => _showEditInventoryDialog(
-                      context,
-                      item,
-                      user?.uid ?? '',
+                    onPressed: () => _showInventoryFormDialog(
+                      context: context,
+                      userId: user?.uid ?? '',
+                      item: item,
                     ),
                   ),
                 ),
@@ -105,7 +128,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddInventoryDialog(context, user?.uid ?? ''),
+        onPressed: () =>
+            _showInventoryFormDialog(context: context, userId: user?.uid ?? ''),
         icon: const Icon(Icons.add),
         label: const Text('Add Item'),
       ),
@@ -118,10 +142,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     InventoryModel? item,
   }) {
     final formKey = GlobalKey<FormState>();
-    String itemName = item?.itemName ?? '';
+    String? itemName = item?.itemName;
     int quantity = item?.quantity ?? 0;
-    String unit = item?.unit ?? 'kg';
-    String type = item?.type ?? 'raw';
+    String? unit = item?.unit;
+    String? type = item?.type;
     int lowStockThreshold = item?.lowStockThreshold ?? 10;
 
     final isEdit = item != null;
@@ -139,15 +163,19 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
               runSpacing: 12,
               children: [
                 DropdownButtonFormField<String>(
-                  value: itemName.isNotEmpty ? itemName : null,
+                  value: itemName,
                   decoration: const InputDecoration(labelText: 'Item Name'),
-                  items: ['Wheat', 'Oil', 'Plates', 'Rolls']
+                  items: itemNames
                       .map(
-                        (name) => DropdownMenuItem(value: name, child: Text(name)),
+                        (name) => DropdownMenuItem<String>(
+                          value: name.toString(),
+                          child: Text(name.toString()),
+                        ),
                       )
                       .toList(),
-                  onChanged: (val) => itemName = val!,
-                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                  onChanged: (val) => itemName = val,
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'Select item' : null,
                 ),
                 TextFormField(
                   initialValue: quantity.toString(),
@@ -163,21 +191,32 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                 DropdownButtonFormField<String>(
                   value: unit,
                   decoration: const InputDecoration(labelText: 'Unit'),
-                  items: ['kg', 'pcs', 'litre']
-                      .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                  items: units
+                      .map(
+                        (u) => DropdownMenuItem<String>(
+                          value: u.toString(),
+                          child: Text(u.toString()),
+                        ),
+                      )
                       .toList(),
-                  onChanged: (val) => unit = val!,
+                  onChanged: (val) => unit = val,
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'Select unit' : null,
                 ),
                 DropdownButtonFormField<String>(
                   value: type,
                   decoration: const InputDecoration(labelText: 'Type'),
-                  items: ['raw', 'prepared']
-                      .map((t) => DropdownMenuItem(
-                            value: t,
-                            child: Text(t.toUpperCase()),
-                          ))
+                  items: itemTypes
+                      .map(
+                        (t) => DropdownMenuItem<String>(
+                          value: t.toString(),
+                          child: Text(t.toString().toUpperCase()),
+                        ),
+                      )
                       .toList(),
-                  onChanged: (val) => type = val!,
+                  onChanged: (val) => type = val,
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'Select type' : null,
                 ),
                 TextFormField(
                   initialValue: lowStockThreshold.toString(),
@@ -185,7 +224,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                     labelText: 'Low Stock Threshold',
                   ),
                   keyboardType: TextInputType.number,
-                  onSaved: (val) => lowStockThreshold = int.parse(val!),
+                  onSaved: (val) =>
+                      lowStockThreshold = int.tryParse(val ?? '') ?? 10,
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
@@ -204,20 +244,19 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                         'updatedBy': userId,
                       };
 
-                     if (isEdit) {
-  await repo.updateInventory(item.id, data);
-  await addNotification(
-    title: 'Inventory Updated',
-    body: '${itemName} updated to $quantity $unit',
-  ); // ✅
-} else {
-  await repo.addInventory(data);
-  await addNotification(
-    title: 'New Inventory Item',
-    body: '$itemName added with $quantity $unit',
-  ); // ✅
-}
-
+                      if (isEdit) {
+                        await repo.updateInventory(item!.id, data);
+                        await addNotification(
+                          title: 'Inventory Updated',
+                          body: '$itemName updated to $quantity $unit',
+                        );
+                      } else {
+                        await repo.addInventory(data);
+                        await addNotification(
+                          title: 'New Inventory Item',
+                          body: '$itemName added with $quantity $unit',
+                        );
+                      }
 
                       if (context.mounted) Navigator.of(context).pop();
                     }
@@ -231,17 +270,5 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
         ),
       ),
     );
-  }
-
-  void _showAddInventoryDialog(BuildContext context, String userId) {
-    _showInventoryFormDialog(context: context, userId: userId);
-  }
-
-  void _showEditInventoryDialog(
-    BuildContext context,
-    InventoryModel item,
-    String userId,
-  ) {
-    _showInventoryFormDialog(context: context, userId: userId, item: item);
   }
 }

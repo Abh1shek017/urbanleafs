@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../services/json_storage_service.dart';
 import '../../providers/payment_provider.dart';
 import '../../constants/app_constants.dart';
 import '../../providers/notifications_provider.dart';
@@ -18,8 +19,21 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
   String? _selectedCustomer;
   String _paymentType = AppConstants.paymentCash;
 
-  // TODO: Replace with dynamic list
-  final List<String> customerList = ['Ravi', 'Sita', 'John'];
+  final jsonStorage = JsonStorageService();
+  List<String> _customerList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomers();
+  }
+
+  Future<void> _loadCustomers() async {
+    final customers = await jsonStorage.getField('customers') as List<dynamic>;
+    setState(() {
+      _customerList = customers.map((e) => e.toString()).toList();
+    });
+  }
 
   void _submitPayment() async {
     if (_formKey.currentState!.validate()) {
@@ -34,7 +48,6 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
         'type': _paymentType,
       });
 
-      // ✅ Create notification for payment received
       await ref.read(
         createNotificationProvider({
           'title': 'Payment Received',
@@ -43,12 +56,17 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
         }),
       );
 
-      // Reset fields
       setState(() {
         _amountController.clear();
         _selectedCustomer = null;
         _paymentType = AppConstants.paymentCash;
       });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment added successfully')),
+        );
+      }
     }
   }
 
@@ -67,9 +85,12 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
               DropdownButtonFormField<String>(
                 value: _selectedCustomer,
                 hint: const Text("Select Customer"),
-                items: customerList.map((name) {
-                  return DropdownMenuItem(value: name, child: Text(name));
-                }).toList(),
+                items: _customerList
+                    .map((name) => DropdownMenuItem(
+                          value: name,
+                          child: Text(name),
+                        ))
+                    .toList(),
                 onChanged: (val) => setState(() => _selectedCustomer = val),
                 validator: (val) =>
                     val == null || val.isEmpty ? 'Select a customer' : null,
@@ -101,18 +122,14 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: _paymentType,
-                      items:
-                          [AppConstants.paymentCash, AppConstants.paymentOnline]
-                              .map(
-                                (type) => DropdownMenuItem(
-                                  value: type,
-                                  child: Text(type),
-                                ),
-                              )
-                              .toList(),
+                      items: [AppConstants.paymentCash, AppConstants.paymentOnline]
+                          .map((type) => DropdownMenuItem(
+                                value: type,
+                                child: Text(type),
+                              ))
+                          .toList(),
                       onChanged: (val) => setState(
-                        () => _paymentType = val ?? AppConstants.paymentCash,
-                      ),
+                          () => _paymentType = val ?? AppConstants.paymentCash),
                       decoration: const InputDecoration(labelText: 'Mode'),
                     ),
                   ),

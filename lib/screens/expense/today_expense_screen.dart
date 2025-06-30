@@ -5,6 +5,7 @@ import '../../viewmodels/expense_viewmodel.dart';
 import '../../utils/format_utils.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/capitalize.dart';
+import '../../services/json_storage_service.dart';
 
 class TodayExpenseScreen extends ConsumerStatefulWidget {
   const TodayExpenseScreen({super.key});
@@ -17,7 +18,29 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   String? _description;
   double? _amount;
-  String _type = AppConstants.expenseRawMaterial;
+  String? _type;
+
+  List<dynamic> expenseTypes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExpenseTypes();
+  }
+
+  Future<void> _loadExpenseTypes() async {
+    final jsonService = JsonStorageService();
+    final data = await jsonService.getMasterData();
+    setState(() {
+      expenseTypes = data['expenseTypes'] ?? [
+        AppConstants.expenseRawMaterial,
+        AppConstants.expenseTransportation,
+        AppConstants.expenseLabor,
+        AppConstants.expenseOther,
+      ];
+      _type = expenseTypes.isNotEmpty ? expenseTypes.first.toString() : AppConstants.expenseOther;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,8 +83,7 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                             const SizedBox(height: 4),
                             Text(
                               FormatUtils.formatCurrency(total),
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
+                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                     color: Colors.redAccent,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -78,8 +100,7 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                             const SizedBox(height: 4),
                             Text(
                               expenses.length.toString(),
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
+                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                     color: Colors.blueAccent,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -108,9 +129,7 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                         decoration: const InputDecoration(
                           labelText: "Description",
                         ),
-                        validator: (val) => val == null || val.trim().isEmpty
-                            ? "Required"
-                            : null,
+                        validator: (val) => val == null || val.trim().isEmpty ? "Required" : null,
                         onSaved: (val) => _description = val!.trim(),
                       ),
                       const SizedBox(height: 12),
@@ -133,28 +152,15 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         value: _type,
-                        decoration: const InputDecoration(
-                          labelText: "Expense Type",
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                            value: AppConstants.expenseRawMaterial,
-                            child: Text("Raw Material"),
-                          ),
-                          DropdownMenuItem(
-                            value: AppConstants.expenseTransportation,
-                            child: Text("Transportation"),
-                          ),
-                          DropdownMenuItem(
-                            value: AppConstants.expenseLabor,
-                            child: Text("Labor"),
-                          ),
-                          DropdownMenuItem(
-                            value: AppConstants.expenseOther,
-                            child: Text("Other"),
-                          ),
-                        ],
+                        decoration: const InputDecoration(labelText: "Expense Type"),
+                        items: expenseTypes.map((et) {
+                          return DropdownMenuItem(
+                            value: et.toString(),
+                            child: Text(et.toString()),
+                          );
+                        }).toList(),
                         onChanged: (val) => setState(() => _type = val!),
+                        validator: (val) => val == null || val.isEmpty ? "Select type" : null,
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
@@ -171,10 +177,9 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                             final expenseData = {
                               'description': _description!,
                               'amount': _amount!,
-                              'type': _type,
+                              'type': _type!,
                               'date': Timestamp.now(),
-                              'addedBy':
-                                  'temp_user_id', // Replace with real user ID
+                              'addedBy': 'temp_user_id',
                               'addedAt': Timestamp.now(),
                             };
 
@@ -184,26 +189,19 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                               );
 
                               if (currentContext.mounted) {
-                                // ✅ Refresh provider and reset form
                                 ref.invalidate(todaysExpensesStreamProvider);
                                 _formKey.currentState!.reset();
-                                setState(
-                                  () => _type = AppConstants.expenseRawMaterial,
-                                );
+                                setState(() => _type = expenseTypes.isNotEmpty
+                                    ? expenseTypes.first.toString()
+                                    : AppConstants.expenseOther);
 
-                                ScaffoldMessenger.of(
-                                  currentContext,
-                                ).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Expense added successfully"),
-                                  ),
+                                ScaffoldMessenger.of(currentContext).showSnackBar(
+                                  const SnackBar(content: Text("Expense added successfully")),
                                 );
                               }
                             } catch (e) {
                               if (currentContext.mounted) {
-                                ScaffoldMessenger.of(
-                                  currentContext,
-                                ).showSnackBar(
+                                ScaffoldMessenger.of(currentContext).showSnackBar(
                                   SnackBar(content: Text("Failed: $e")),
                                 );
                               }
@@ -237,19 +235,12 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              "Amount: ₹${expense.amount.toStringAsFixed(2)}",
-                            ),
+                            Text("Amount: ₹${expense.amount.toStringAsFixed(2)}"),
                             Text("Type: ${expense.type.capitalize()}"),
-                            Text(
-                              "Added at: ${FormatUtils.formatTime(expense.addedAt)}",
-                            ),
+                            Text("Added at: ${FormatUtils.formatTime(expense.addedAt)}"),
                           ],
                         ),
-                        trailing: const Icon(
-                          Icons.receipt_long,
-                          color: Colors.grey,
-                        ),
+                        trailing: const Icon(Icons.receipt_long, color: Colors.grey),
                       ),
                     );
                   },

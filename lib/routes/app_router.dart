@@ -1,4 +1,5 @@
 // import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +7,7 @@ import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../utils/go_router_refresh_stream.dart';
+
 
 // Screens
 import '../screens/auth/login_screen.dart';
@@ -34,6 +36,8 @@ import '../screens/settings/manage_users_screen.dart';
 import '../screens/support/faq_screen.dart';
 import '../screens/support/feedback_screen.dart';
 import '../screens/support/contact_us_screen.dart';
+import '../screens/support/help_screen.dart';
+import '../screens/support/report_problem_screen.dart';
 
 // Legal
 import '../screens/legal/legal_screen.dart';
@@ -43,6 +47,19 @@ import '../screens/legal/terms_screen.dart';
 
 // Notifications
 import '../screens/notifications/notifications_screen.dart';
+import '../screens/settings_menu/settings_menu_screen.dart';
+
+// Master Data
+import '../screens/master_data/manage_customers_screen.dart';
+import '../screens/master_data/manage_inventory_screen.dart';
+import '../screens/master_data/manage_orders_screen.dart';
+import '../screens/master_data/manage_expenses_screen.dart';
+
+// Activity
+import '../screens/activity/favorites_screen.dart';
+import '../screens/activity/downloads_screen.dart';
+import '../screens/activity/recent_activity_screen.dart';
+import '../screens/activity/usage_stats_screen.dart';
 
 // User Test
 // import '../../test/user_test.dart';
@@ -213,6 +230,86 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/notifications',
         name: 'notifications',
         builder: (context, state) => NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/settings-menu',
+        pageBuilder: (context, state) {
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const SettingsMenuScreen(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(1, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  );
+                },
+          );
+        },
+      ),
+
+      // Master Data
+      GoRoute(
+        path: '/master-data/customers',
+        name: 'manage_customers',
+        builder: (context, state) => const ManageCustomersScreen(),
+      ),
+      GoRoute(
+        path: '/master-data/inventory',
+        name: 'manage_inventory',
+        builder: (context, state) => const ManageInventoryScreen(),
+      ),
+      GoRoute(
+        path: '/master-data/orders',
+        name: 'manage_orders',
+        builder: (context, state) => const ManageOrdersScreen(),
+      ),
+      GoRoute(
+        path: '/master-data/expenses',
+        name: 'manage_expenses',
+        builder: (context, state) => const ManageExpensesScreen(),
+      ),
+
+      // Activity
+      GoRoute(
+        path: '/orders/history',
+        name: 'orders_history',
+        builder: (context, state) => const TodayOrdersScreen(),
+      ),
+      GoRoute(
+        path: '/activity/favorites',
+        name: 'activity_favorites',
+        builder: (context, state) => const FavoritesScreen(),
+      ),
+      GoRoute(
+        path: '/activity/downloads',
+        name: 'activity_downloads',
+        builder: (context, state) => const DownloadsScreen(),
+      ),
+      GoRoute(
+        path: '/activity/recent',
+        name: 'activity_recent',
+        builder: (context, state) => const RecentActivityScreen(),
+      ),
+      GoRoute(
+        path: '/activity/usage',
+        name: 'activity_usage',
+        builder: (context, state) => const UsageStatsScreen(),
+      ),
+
+      // Additional Support Routes
+      GoRoute(
+        path: '/support/help',
+        name: 'support_help',
+        builder: (context, state) => const HelpSupportScreen(),
+      ),
+      GoRoute(
+        path: '/support/report',
+        name: 'support_report',
+        builder: (context, state) => const ReportProblemScreen(),
       ),
     ],
   );

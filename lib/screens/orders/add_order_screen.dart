@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/json_storage_service.dart';
 import '../../viewmodels/order_viewmodel.dart';
 import '../../utils/notifications_util.dart';
 
@@ -13,18 +14,34 @@ class AddOrderCard extends ConsumerStatefulWidget {
 
 class _AddOrderCardState extends ConsumerState<AddOrderCard> {
   final _formKey = GlobalKey<FormState>();
-
-  final List<String> _customerList = ['Ravi', 'Neha', 'Amit', 'Seema'];
-  final List<String> _itemList = ['Small Plate', 'Big Plate', 'Combo Pack'];
-
   String? _selectedCustomer;
   String? _selectedItem;
   int _quantity = 1;
   double _price = 0.0;
-
   final TextEditingController _priceController = TextEditingController();
+  final jsonStorage = JsonStorageService();
+
+  List<String> _customerList = [];
+  List<String> _itemList = [];
 
   double get _total => _quantity * _price;
+
+  @override
+  void initState() {
+    super.initState();
+    _priceController.text = _price.toStringAsFixed(2);
+    _loadMasterData();
+  }
+
+  Future<void> _loadMasterData() async {
+    final customers = await jsonStorage.getField('customers') as List<dynamic>;
+    final items = await jsonStorage.getField('orderItems') as List<dynamic>;
+
+    setState(() {
+      _customerList = customers.map((e) => e.toString()).toList();
+      _itemList = items.map((e) => e.toString()).toList();
+    });
+  }
 
   void _resetForm() {
     _formKey.currentState?.reset();
@@ -35,12 +52,6 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
       _price = 0.0;
       _priceController.text = '0.00';
     });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _priceController.text = _price.toStringAsFixed(2);
   }
 
   @override
@@ -58,9 +69,12 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: 'Customer Name'),
                 value: _selectedCustomer,
-                items: _customerList.map((name) {
-                  return DropdownMenuItem(value: name, child: Text(name));
-                }).toList(),
+                items: _customerList
+                    .map((name) => DropdownMenuItem(
+                          value: name,
+                          child: Text(name),
+                        ))
+                    .toList(),
                 onChanged: (value) => setState(() => _selectedCustomer = value),
                 validator: (value) =>
                     value == null ? 'Please select a customer' : null,
@@ -74,9 +88,12 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
                     child: DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Item'),
                       value: _selectedItem,
-                      items: _itemList.map((item) {
-                        return DropdownMenuItem(value: item, child: Text(item));
-                      }).toList(),
+                      items: _itemList
+                          .map((item) => DropdownMenuItem(
+                                value: item,
+                                child: Text(item),
+                              ))
+                          .toList(),
                       onChanged: (value) =>
                           setState(() => _selectedItem = value),
                       validator: (value) =>
@@ -129,7 +146,7 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
                         if (value == null ||
                             double.tryParse(value) == null ||
                             double.parse(value) < 0) {
-                          return 'Enter a valid price';
+                          return 'Enter valid price';
                         }
                         return null;
                       },
@@ -159,9 +176,7 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
                   ElevatedButton(
                     onPressed: () async {
                       if (_formKey.currentState?.validate() ?? false) {
-                        final currentContext = context;
-                        final userId =
-                            "temp_user_id"; // TODO: Replace with real auth UID
+                        final userId = "temp_user_id"; // TODO: real UID
                         final orderData = {
                           'description': _selectedItem,
                           'quantity': _quantity,
@@ -174,22 +189,15 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
                         await ref.read(
                           addOrderFutureProvider(orderData).future,
                         );
-                         // ✅ Write notification after order added
-    await addNotification(
-      title: 'New Order',
-      body: 'Order for $_selectedItem ($_quantity pcs) by $_selectedCustomer',
-    );
 
-    if (currentContext.mounted) {
-      ScaffoldMessenger.of(currentContext).showSnackBar(
-        const SnackBar(content: Text('Order added successfully')),
-      );
-      _resetForm();
-    }
-  
+                        await addNotification(
+                          title: 'New Order',
+                          body:
+                              'Order for $_selectedItem ($_quantity pcs) by $_selectedCustomer',
+                        );
 
-                        if (currentContext.mounted) {
-                          ScaffoldMessenger.of(currentContext).showSnackBar(
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Order added successfully'),
                             ),
