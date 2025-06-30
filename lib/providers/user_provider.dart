@@ -36,3 +36,5 @@ final userNameByIdProvider = FutureProvider.family<String, String>((ref, uid) as
   final user = await repository.getUserByIdOnce(uid); // we'll add this method next
   return user?.username ?? 'Unknown';
 });
+
+final userProvider = StateProvider<UserModel?>((ref) => null);

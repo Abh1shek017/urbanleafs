@@ -8,6 +8,7 @@ class UserModel {
   final String password;
   final UserRole role;
   final DateTime createdAt;
+  final String? profileImageUrl;
 
   UserModel({
     required this.id,
@@ -15,10 +16,10 @@ class UserModel {
     required this.password,
     required this.role,
     required this.createdAt,
+    this.profileImageUrl,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, {required String id}) {
-    // 🔥 FIXED: This converts "admin" → UserRole.admin correctly
     final roleStr = (map['role'] ?? 'regular').toString().toLowerCase();
     final role = UserRole.values.firstWhere(
       (e) => e.name == roleStr,
@@ -30,10 +31,13 @@ class UserModel {
 
     return UserModel(
       id: id,
-      username: map['username'] ?? '',
-      password: map['password'] ?? '',
+      username: map['username']?.toString() ?? '',
+      password: map['password']?.toString() ?? '',
       role: role,
       createdAt: createdAt,
+      profileImageUrl: map['profileImageUrl'] != null
+          ? map['profileImageUrl'].toString()
+          : null,
     );
   }
 
@@ -46,14 +50,14 @@ class UserModel {
     return {
       'username': username,
       'password': password,
-      'role': role.name, // ✅ Only saves "admin" or "regular"
+      'role': role.name,
       'createdAt': Timestamp.fromDate(createdAt),
+      if (profileImageUrl != null) 'profileImageUrl': profileImageUrl,
     };
   }
 
-  // ✅ Optional: for debugging
   @override
   String toString() {
-    return 'UserModel(username: $username, role: ${role.name})';
+    return 'UserModel(username: $username, role: ${role.name}, profileImageUrl: $profileImageUrl)';
   }
 }

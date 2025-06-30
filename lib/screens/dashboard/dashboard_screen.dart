@@ -15,6 +15,7 @@ import '../profile/profile_screen.dart';
 import '../orders/today_orders_screen.dart';
 import '../payments/today_payments_screen.dart';
 import '../expense/today_expense_screen.dart';
+import '../../providers/user_provider.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -38,6 +39,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final dashboardState = ref.watch(dashboardViewModelProvider);
     final dashboardNotifier = ref.read(dashboardViewModelProvider.notifier);
+    final userAsync = ref.watch(currentUserStreamProvider);
+    String? profileImageUrl;
+    userAsync.whenData((user) {
+      profileImageUrl = user?.profileImageUrl;
+    });
 
     final pages = [
       AttendanceScreen(),
@@ -57,6 +63,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           });
         },
         fabSize: 80,
+        profileImageUrl: profileImageUrl,
       ),
     );
   }

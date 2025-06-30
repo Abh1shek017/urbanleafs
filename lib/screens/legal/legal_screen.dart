@@ -8,7 +8,13 @@ class LegalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Legal & Compliance")),
+      appBar: AppBar(
+        title: const Text("Legal & Compliance"),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: ListView(
         children: [
           ListTile(
@@ -23,7 +29,7 @@ class LegalScreen extends StatelessWidget {
             title: const Text("Terms of Service"),
             onTap: () => context.pushNamed('terms_of_service'),
           ),
-          Divider(height: 1),
+          const Divider(height: 1),
           LegalMenuItem(
             title: "Data Export",
             subtitle: "Export your personal data anytime",
@@ -38,14 +44,14 @@ class LegalScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text("Data Export"),
-        content: Text(
+        title: const Text("Data Export"),
+        content: const Text(
           "You can export your data as JSON or CSV. This feature will be available in a future update.",
         ),
         actions: [
           TextButton(
-            onPressed: Navigator.of(context).pop,
-            child: Text("Close"),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Close"),
           ),
         ],
       ),
