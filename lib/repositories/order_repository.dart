@@ -15,9 +15,10 @@ class OrderRepository extends BaseRepository {
         .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(today))
         .where('orderTime', isLessThan: Timestamp.fromDate(tomorrow))
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => OrderModel.fromSnapshot(doc))
-            .toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList(),
+        );
   }
 
   /// Stream of count of today's orders (real-time)
@@ -27,6 +28,22 @@ class OrderRepository extends BaseRepository {
 
   /// Add a new order
   Future<void> addOrder(Map<String, dynamic> orderData) async {
-    await collection.add(orderData);
+    final docRef = await collection.add(orderData);
+
+    // ✅ Create notification for new order
+    try {
+      final customerName = orderData['customerName'] ?? 'Customer';
+      final orderId = docRef.id;
+
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'title': 'New Order',
+        'body': 'Order #$orderId placed by $customerName',
+        'isRead': false,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      // Don't fail order creation if notification fails
+      print('Failed to create order notification: $e');
+    }
   }
 }

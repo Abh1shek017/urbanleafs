@@ -4,7 +4,6 @@ import '../../constants/app_constants.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/attendance_provider.dart';
 import '../../providers/attendance_status_provider.dart' as asp;
-// import '../../viewmodels/attendance_viewmodel.dart' as vm;
 import 'package:urbanleafs/utils/capitalize.dart';
 
 class DailyAttendanceShiftPage extends ConsumerWidget {

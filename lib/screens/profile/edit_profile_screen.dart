@@ -224,8 +224,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                     );
                                   }
                                 } finally {
-                                  if (mounted)
+                                  if (mounted) {
                                     setState(() => _isSaving = false);
+                                  }
                                 }
                               }
                             }

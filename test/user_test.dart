@@ -31,7 +31,7 @@ class _TestUploadScreenState extends State<TestUploadScreen> {
       }
 
       final uid = auth.uid;
-      final path = 'users_images/profile_${uid}.jpg';
+      final path = 'users_images/profile_$uid.jpg';
       final file = File(pickedFile.path);
 
       setState(() {

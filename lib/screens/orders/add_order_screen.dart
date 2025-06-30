@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../viewmodels/order_viewmodel.dart';
+import '../../utils/notifications_util.dart';
 
 class AddOrderCard extends ConsumerStatefulWidget {
   const AddOrderCard({super.key});
@@ -173,6 +174,19 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
                         await ref.read(
                           addOrderFutureProvider(orderData).future,
                         );
+                         // ✅ Write notification after order added
+    await addNotification(
+      title: 'New Order',
+      body: 'Order for $_selectedItem ($_quantity pcs) by $_selectedCustomer',
+    );
+
+    if (currentContext.mounted) {
+      ScaffoldMessenger.of(currentContext).showSnackBar(
+        const SnackBar(content: Text('Order added successfully')),
+      );
+      _resetForm();
+    }
+  
 
                         if (currentContext.mounted) {
                           ScaffoldMessenger.of(currentContext).showSnackBar(

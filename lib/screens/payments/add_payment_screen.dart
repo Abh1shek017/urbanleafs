@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/payment_provider.dart';
 import '../../constants/app_constants.dart';
+import '../../providers/notifications_provider.dart';
 
 class AddPaymentCard extends ConsumerStatefulWidget {
   final String userId;
@@ -32,6 +33,15 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
         'receivedBy': widget.userId,
         'type': _paymentType,
       });
+
+      // ✅ Create notification for payment received
+      await ref.read(
+        createNotificationProvider({
+          'title': 'Payment Received',
+          'body':
+              '₹${amount.toStringAsFixed(2)} from $_selectedCustomer ($_paymentType)',
+        }),
+      );
 
       // Reset fields
       setState(() {

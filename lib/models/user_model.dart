@@ -35,9 +35,7 @@ class UserModel {
       password: map['password']?.toString() ?? '',
       role: role,
       createdAt: createdAt,
-      profileImageUrl: map['profileImageUrl'] != null
-          ? map['profileImageUrl'].toString()
-          : null,
+      profileImageUrl: map['profileImageUrl']?.toString(),
     );
   }
 

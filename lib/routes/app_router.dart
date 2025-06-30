@@ -24,7 +24,7 @@ import '../screens/profile/change_password_screen.dart';
 // Settings
 import '../screens/settings/settings_screen.dart';
 import '../screens/settings/general_setting_screen.dart';
-import '../screens/settings/notifications_screen.dart';
+import '../screens/settings/notification_screen.dart';
 import '../screens/settings/privacy_settings_screen.dart';
 import '../screens/settings/language_screen.dart';
 import '../screens/appearance/appearance_setting_screen.dart';
@@ -40,6 +40,9 @@ import '../screens/legal/legal_screen.dart';
 import '../screens/legal/app_info_screen.dart';
 import '../screens/legal/privacy_screen.dart';
 import '../screens/legal/terms_screen.dart';
+
+// Notifications
+import '../screens/notifications/notifications_screen.dart';
 
 // User Test
 // import '../../test/user_test.dart';
@@ -129,8 +132,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const GeneralSettingsScreen(),
       ),
       GoRoute(
-        path: '/settings/notifications',
-        name: 'notifications',
+        path: '/settings/notification',
+        name: 'notifications_settings',
         builder: (context, state) => const NotificationsSettingsScreen(),
       ),
       GoRoute(
@@ -205,6 +208,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return null;
         },
         builder: (context, state) => const ManageUsersScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => NotificationsScreen(),
       ),
     ],
   );

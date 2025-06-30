@@ -138,6 +138,29 @@ class AttendanceRepository extends BaseRepository {
         'markedBy': markedBy,
       });
     }
+
+    // ✅ Create notification for attendance update
+    try {
+      // Get worker name for notification
+      final workerDoc = await FirebaseFirestore.instance
+          .collection('workers')
+          .doc(userId)
+          .get();
+
+      final workerName = workerDoc.exists
+          ? (workerDoc.data() as Map<String, dynamic>)['name'] ?? 'Worker'
+          : 'Worker';
+
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'title': 'Attendance Updated',
+        'body': '$workerName marked $status in $shift shift',
+        'isRead': false,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      // Don't fail attendance marking if notification fails
+      print('Failed to create attendance notification: $e');
+    }
   }
 
   Future<List<AttendanceModel>> getAllAttendanceForDay(DateTime date) async {

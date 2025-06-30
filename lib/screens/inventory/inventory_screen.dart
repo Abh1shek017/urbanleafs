@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../../utils/notifications_util.dart';
 import '../../providers/inventory_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/inventory_model.dart';
@@ -204,11 +204,20 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                         'updatedBy': userId,
                       };
 
-                      if (isEdit) {
-                        await repo.updateInventory(item.id, data);
-                      } else {
-                        await repo.addInventory(data);
-                      }
+                     if (isEdit) {
+  await repo.updateInventory(item.id, data);
+  await addNotification(
+    title: 'Inventory Updated',
+    body: '${itemName} updated to $quantity $unit',
+  ); // ✅
+} else {
+  await repo.addInventory(data);
+  await addNotification(
+    title: 'New Inventory Item',
+    body: '$itemName added with $quantity $unit',
+  ); // ✅
+}
+
 
                       if (context.mounted) Navigator.of(context).pop();
                     }

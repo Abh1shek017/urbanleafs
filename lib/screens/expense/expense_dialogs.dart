@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/app_constants.dart';
 import '../../models/expense_model.dart';
 import '../../viewmodels/expense_viewmodel.dart';
-
+import '../../utils/notifications_util.dart';
 /// Show Add Expense Dialog (Bottom Sheet)
 void showAddExpenseDialog(BuildContext context, WidgetRef ref) {
   final formKey = GlobalKey<FormState>();
@@ -101,6 +101,11 @@ void showAddExpenseDialog(BuildContext context, WidgetRef ref) {
                       await ref.read(
                         markExpenseFutureProvider(expenseData).future,
                       );
+                      // ✅ write notification
+await addNotification(
+  title: 'New Expense',
+  body: '$description ₹${amount!.toStringAsFixed(2)} ($type)',
+);
                       if (currentContext.mounted) {
                         Navigator.of(currentContext).pop();
                       }
@@ -228,6 +233,11 @@ void showEditExpenseDialog(
                           'data': updatedData,
                         }).future,
                       );
+                      // ✅ write notification
+await addNotification(
+  title: 'Expense Updated',
+  body: '${updatedDescription} ₹${updatedAmount.toStringAsFixed(2)} ($updatedType)',
+);
                       if (currentContext.mounted) {
                         Navigator.of(currentContext).pop();
                       }
