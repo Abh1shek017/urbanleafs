@@ -8,6 +8,7 @@ import '../../models/inventory_model.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../providers/user_provider.dart';
 import '../../services/json_storage_service.dart';
+import '../../services/master_data_service.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -18,10 +19,11 @@ class InventoryScreen extends ConsumerStatefulWidget {
 
 class _InventoryScreenState extends ConsumerState<InventoryScreen>
     with AutomaticKeepAliveClientMixin {
-  final JsonStorageService jsonStorage = JsonStorageService();
-  List<dynamic> itemNames = [];
-  List<dynamic> units = [];
-  List<dynamic> itemTypes = [];
+  final MasterDataService masterDataService = MasterDataService();
+  List<String> itemNames = [];
+  List<String> units = [];
+  List<String> itemTypes = [];
+  bool _loading = true;
 
   @override
   bool get wantKeepAlive => true;
@@ -33,11 +35,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
   }
 
   Future<void> _loadMasterData() async {
-    final data = await jsonStorage.getMasterData();
+    final data = await masterDataService.loadLocalMasterData();
     setState(() {
-      itemNames = data['inventoryTypes'] ?? [];
-      units = data['units'] ?? [];
-      itemTypes = data['itemTypes'] ?? [];
+      itemNames = (data['inventoryTypes'] ?? [])
+          .map<String>((e) => e.toString())
+          .toList();
+      units = (data['units'] ?? []).map<String>((e) => e.toString()).toList();
+      itemTypes = (data['itemTypes'] ?? [])
+          .map<String>((e) => e.toString())
+          .toList();
+      _loading = false;
     });
   }
 
@@ -49,84 +56,92 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
 
     return Scaffold(
       appBar: AppBar(title: const Text("Inventory Status")),
-      body: inventoryAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
-        data: (items) {
-          if (items.isEmpty) {
-            return const Center(child: Text('No inventory items found.'));
-          }
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : inventoryAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text('Error: $err')),
+              data: (items) {
+                if (items.isEmpty) {
+                  return const Center(child: Text('No inventory items found.'));
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              final isLowStock = item.quantity < item.lowStockThreshold;
-              final isRaw = item.type == 'raw';
+                return ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final isLowStock = item.quantity < item.lowStockThreshold;
+                    final isRaw = item.type == 'raw';
 
-              final userNameAsync = ref.watch(
-                userNameByIdProvider(item.updatedBy),
-              );
+                    final userNameAsync = ref.watch(
+                      userNameByIdProvider(item.updatedBy),
+                    );
 
-              return Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ListTile(
-                  title: Row(
-                    children: [
-                      Text(
-                        item.itemName,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                    return Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(width: 8),
-                      if (isLowStock)
-                        const Icon(Icons.warning, color: Colors.red, size: 18),
-                      if (!isLowStock)
-                        const Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 18,
+                      child: ListTile(
+                        title: Row(
+                          children: [
+                            Text(
+                              item.itemName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (isLowStock)
+                              const Icon(
+                                Icons.warning,
+                                color: Colors.red,
+                                size: 18,
+                              ),
+                            if (!isLowStock)
+                              const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 18,
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
-                  subtitle: userNameAsync.when(
-                    data: (name) => Text(
-                      'Qty: ${item.quantity} ${item.unit}\nType: ${item.type.toUpperCase()}\nUpdated by: $name',
-                      style: TextStyle(
-                        color: isRaw ? Colors.orange : Colors.teal,
+                        subtitle: userNameAsync.when(
+                          data: (name) => Text(
+                            'Qty: ${item.quantity} ${item.unit}\nType: ${item.type.toUpperCase()}\nUpdated by: $name',
+                            style: TextStyle(
+                              color: isRaw ? Colors.orange : Colors.teal,
+                            ),
+                          ),
+                          loading: () => Text(
+                            'Qty: ${item.quantity} ${item.unit}\nType: ${item.type.toUpperCase()}\nUpdated by: ...',
+                            style: TextStyle(
+                              color: isRaw ? Colors.orange : Colors.teal,
+                            ),
+                          ),
+                          error: (_, __) => Text(
+                            'Qty: ${item.quantity} ${item.unit}\nType: ${item.type.toUpperCase()}\nUpdated by: Unknown',
+                            style: TextStyle(
+                              color: isRaw ? Colors.orange : Colors.teal,
+                            ),
+                          ),
+                        ),
+                        isThreeLine: true,
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () => _showInventoryFormDialog(
+                            context: context,
+                            userId: user?.uid ?? '',
+                            item: item,
+                          ),
+                        ),
                       ),
-                    ),
-                    loading: () => Text(
-                      'Qty: ${item.quantity} ${item.unit}\nType: ${item.type.toUpperCase()}\nUpdated by: ...',
-                      style: TextStyle(
-                        color: isRaw ? Colors.orange : Colors.teal,
-                      ),
-                    ),
-                    error: (_, __) => Text(
-                      'Qty: ${item.quantity} ${item.unit}\nType: ${item.type.toUpperCase()}\nUpdated by: Unknown',
-                      style: TextStyle(
-                        color: isRaw ? Colors.orange : Colors.teal,
-                      ),
-                    ),
-                  ),
-                  isThreeLine: true,
-                  trailing: IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () => _showInventoryFormDialog(
-                      context: context,
-                      userId: user?.uid ?? '',
-                      item: item,
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                    );
+                  },
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () =>
             _showInventoryFormDialog(context: context, userId: user?.uid ?? ''),

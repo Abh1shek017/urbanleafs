@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../services/json_storage_service.dart';
+import '../../services/master_data_service.dart';
 import '../../widgets/glass_cards.dart';
 import '../../utils/staggered_animation.dart';
+import '../../widgets/admin_checker.dart';
+import '../../utils/unique_list_utils.dart';
 
 class ManageCustomersScreen extends StatefulWidget {
   const ManageCustomersScreen({super.key});
@@ -11,7 +13,7 @@ class ManageCustomersScreen extends StatefulWidget {
 }
 
 class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
-  final JsonStorageService _service = JsonStorageService();
+  final MasterDataService _service = MasterDataService();
   List<dynamic> _customers = [];
 
   @override
@@ -21,13 +23,24 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   }
 
   Future<void> _loadData() async {
-    final data = await _service.getMasterData();
-    setState(() => _customers = data['customers'] ?? []);
+    final data = await _service.loadLocalMasterData();
+    final customers = UniqueListUtils.safeUniqueStringList(data['customers']);
+    if (customers.isEmpty) {
+      final fresh = await _service.fetchAndUpdateFromFirestore();
+      setState(() => _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']));
+    } else {
+      setState(() => _customers = customers);
+    }
+  }
+
+  Future<void> _pullRefresh() async {
+    final fresh = await _service.fetchAndUpdateFromFirestore();
+    setState(() => _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']));
   }
 
   void _addCustomer() async {
-    final controller = TextEditingController();
-    final phoneController = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -35,18 +48,19 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: controller, decoration: const InputDecoration(labelText: "Name")),
-            TextField(controller: phoneController, decoration: const InputDecoration(labelText: "Phone")),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Name")),
+            TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: "Phone")),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () {
-              final newCustomer = "${controller.text.trim()} (${phoneController.text.trim()})";
+            onPressed: () async {
+              final newCustomer = "${nameCtrl.text.trim()} (${phoneCtrl.text.trim()})";
               setState(() => _customers.add(newCustomer));
-              _service.updateMasterDataField('customers', _customers);
-              Navigator.pop(ctx);
+              await _service.updateMasterField('customers', _customers);
+              await _loadData();
+              if (mounted) Navigator.pop(ctx);
             },
             child: const Text("Add"),
           ),
@@ -55,38 +69,46 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     );
   }
 
-  void _deleteCustomer(int index) {
+  void _deleteCustomer(int index) async {
     setState(() => _customers.removeAt(index));
-    _service.updateMasterDataField('customers', _customers);
+    await _service.updateMasterField('customers', _customers);
+    await _loadData();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Manage Customers")),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addCustomer,
-        child: const Icon(Icons.add),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView.builder(
-          itemCount: _customers.length,
-          itemBuilder: (ctx, i) => StaggeredItem(
-            index: i,
-            child: GlassCard(
-              onTap: () => _deleteCustomer(i),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(_customers[i], style: Theme.of(context).textTheme.bodyLarge),
-                  const Icon(Icons.delete_outline, color: Colors.red),
-                ],
+    return AdminChecker(
+      builder: (context, isAdmin) {
+        return Scaffold(
+          appBar: AppBar(title: const Text("Manage Customers")),
+          floatingActionButton: isAdmin 
+            ? FloatingActionButton(onPressed: _addCustomer, child: const Icon(Icons.add))
+            : null,
+          body: RefreshIndicator(
+            onRefresh: isAdmin ? _pullRefresh : () async {},
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ListView.builder(
+                itemCount: _customers.length,
+                itemBuilder: (ctx, i) => StaggeredItem(
+                  index: i,
+                  child: GlassCard(
+                    onTap: isAdmin ? () => _deleteCustomer(i) : null,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_customers[i], style: Theme.of(context).textTheme.bodyLarge),
+                        if (isAdmin)
+                          const Icon(Icons.delete_outline, color: Colors.red),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

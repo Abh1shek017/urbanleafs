@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/master_data_service.dart';
 import '../../viewmodels/expense_viewmodel.dart';
 import '../../utils/format_utils.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/capitalize.dart';
-import '../../services/json_storage_service.dart';
+// import '../../services/json_storage_service.dart';
 
 class TodayExpenseScreen extends ConsumerStatefulWidget {
   const TodayExpenseScreen({super.key});
@@ -20,7 +21,8 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
   double? _amount;
   String? _type;
 
-  List<dynamic> expenseTypes = [];
+  List<String> expenseTypes = [];
+  bool _loading = true;
 
   @override
   void initState() {
@@ -29,16 +31,31 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
   }
 
   Future<void> _loadExpenseTypes() async {
-    final jsonService = JsonStorageService();
-    final data = await jsonService.getMasterData();
+    final masterDataService = MasterDataService();
+    final data = await masterDataService.loadLocalMasterData();
+    List<String> types;
+
+    final rawTypes = data['expenseTypes'];
+    if (rawTypes is List) {
+      types = rawTypes.map((e) => e.toString()).toList();
+    } else if (rawTypes is Map) {
+      types = rawTypes.values.map((e) => e.toString()).toList();
+    } else {
+      types = [];
+    }
+
+    if (!mounted) return;
     setState(() {
-      expenseTypes = data['expenseTypes'] ?? [
-        AppConstants.expenseRawMaterial,
-        AppConstants.expenseTransportation,
-        AppConstants.expenseLabor,
-        AppConstants.expenseOther,
-      ];
-      _type = expenseTypes.isNotEmpty ? expenseTypes.first.toString() : AppConstants.expenseOther;
+      expenseTypes = types.isNotEmpty
+          ? types
+          : [
+              AppConstants.expenseRawMaterial,
+              AppConstants.expenseTransportation,
+              AppConstants.expenseLabor,
+              AppConstants.expenseOther,
+            ];
+      _type = expenseTypes.first;
+      _loading = false;
     });
   }
 
@@ -83,7 +100,8 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                             const SizedBox(height: 4),
                             Text(
                               FormatUtils.formatCurrency(total),
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
                                     color: Colors.redAccent,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -100,7 +118,8 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                             const SizedBox(height: 4),
                             Text(
                               expenses.length.toString(),
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
                                     color: Colors.blueAccent,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -121,97 +140,118 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: "Description",
+                if (_loading)
+                  const LinearProgressIndicator()
+                else
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          decoration: const InputDecoration(
+                            labelText: "Description",
+                          ),
+                          validator: (val) => val == null || val.trim().isEmpty
+                              ? "Required"
+                              : null,
+                          onSaved: (val) => _description = val!.trim(),
                         ),
-                        validator: (val) => val == null || val.trim().isEmpty ? "Required" : null,
-                        onSaved: (val) => _description = val!.trim(),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: "Amount (₹)",
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return "Required";
-                          }
-                          if (double.tryParse(val) == null) {
-                            return "Invalid number";
-                          }
-                          return null;
-                        },
-                        onSaved: (val) => _amount = double.parse(val!),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _type,
-                        decoration: const InputDecoration(labelText: "Expense Type"),
-                        items: expenseTypes.map((et) {
-                          return DropdownMenuItem(
-                            value: et.toString(),
-                            child: Text(et.toString()),
-                          );
-                        }).toList(),
-                        onChanged: (val) => setState(() => _type = val!),
-                        validator: (val) => val == null || val.isEmpty ? "Select type" : null,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.check),
-                        label: const Text("Add Expense"),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                        ),
-                        onPressed: () async {
-                          if (_formKey.currentState!.validate()) {
-                            _formKey.currentState!.save();
-                            final currentContext = context;
-
-                            final expenseData = {
-                              'description': _description!,
-                              'amount': _amount!,
-                              'type': _type!,
-                              'date': Timestamp.now(),
-                              'addedBy': 'temp_user_id',
-                              'addedAt': Timestamp.now(),
-                            };
-
-                            try {
-                              await ref.read(
-                                markExpenseFutureProvider(expenseData).future,
-                              );
-
-                              if (currentContext.mounted) {
-                                ref.invalidate(todaysExpensesStreamProvider);
-                                _formKey.currentState!.reset();
-                                setState(() => _type = expenseTypes.isNotEmpty
-                                    ? expenseTypes.first.toString()
-                                    : AppConstants.expenseOther);
-
-                                ScaffoldMessenger.of(currentContext).showSnackBar(
-                                  const SnackBar(content: Text("Expense added successfully")),
-                                );
-                              }
-                            } catch (e) {
-                              if (currentContext.mounted) {
-                                ScaffoldMessenger.of(currentContext).showSnackBar(
-                                  SnackBar(content: Text("Failed: $e")),
-                                );
-                              }
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          decoration: const InputDecoration(
+                            labelText: "Amount (₹)",
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) {
+                              return "Required";
                             }
-                          }
-                        },
-                      ),
-                    ],
+                            if (double.tryParse(val) == null) {
+                              return "Invalid number";
+                            }
+                            return null;
+                          },
+                          onSaved: (val) => _amount = double.parse(val!),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: _type,
+                          decoration: const InputDecoration(
+                            labelText: "Expense Type",
+                          ),
+                          items: expenseTypes.map((et) {
+                            return DropdownMenuItem(
+                              value: et,
+                              child: Text(et),
+                            );
+                          }).toList(),
+                          onChanged: (val) => setState(() => _type = val!),
+                          validator: (val) =>
+                              val == null || val.isEmpty ? "Select type" : null,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.check),
+                          label: const Text("Add Expense"),
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                          ),
+                          onPressed: _loading
+                              ? null
+                              : () async {
+                                  if (_formKey.currentState!.validate()) {
+                                    _formKey.currentState!.save();
+                                    final currentContext = context;
+
+                                    final expenseData = {
+                                      'description': _description!,
+                                      'amount': _amount!,
+                                      'type': _type!,
+                                      'date': Timestamp.now(),
+                                      'addedBy': 'temp_user_id',
+                                      'addedAt': Timestamp.now(),
+                                    };
+
+                                    try {
+                                      await ref.read(
+                                        markExpenseFutureProvider(expenseData)
+                                            .future,
+                                      );
+
+                                      if (currentContext.mounted) {
+                                        ref.invalidate(
+                                            todaysExpensesStreamProvider);
+                                        _formKey.currentState!.reset();
+                                        setState(
+                                          () => _type = expenseTypes.isNotEmpty
+                                              ? expenseTypes.first
+                                              : AppConstants.expenseOther,
+                                        );
+
+                                        ScaffoldMessenger.of(
+                                          currentContext,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                "Expense added successfully"),
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (currentContext.mounted) {
+                                        ScaffoldMessenger.of(
+                                          currentContext,
+                                        ).showSnackBar(
+                                          SnackBar(content: Text("Failed: $e")),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
                 const SizedBox(height: 32),
 
@@ -235,12 +275,19 @@ class _TodayExpenseScreenState extends ConsumerState<TodayExpenseScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text("Amount: ₹${expense.amount.toStringAsFixed(2)}"),
+                            Text(
+                              "Amount: ₹${expense.amount.toStringAsFixed(2)}",
+                            ),
                             Text("Type: ${expense.type.capitalize()}"),
-                            Text("Added at: ${FormatUtils.formatTime(expense.addedAt)}"),
+                            Text(
+                              "Added at: ${FormatUtils.formatTime(expense.addedAt)}",
+                            ),
                           ],
                         ),
-                        trailing: const Icon(Icons.receipt_long, color: Colors.grey),
+                        trailing: const Icon(
+                          Icons.receipt_long,
+                          color: Colors.grey,
+                        ),
                       ),
                     );
                   },

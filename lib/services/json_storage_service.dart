@@ -18,8 +18,10 @@ class JsonStorageService {
     final initialData = {
       "customers": [],
       "inventoryTypes": [],
+      "units": [],
+      "itemTypes": [],
       "orderItems": [],
-      "expenseTypes": []
+      "expenseTypes": [],
     };
     await file.writeAsString(jsonEncode(initialData));
   }
@@ -39,8 +41,10 @@ class JsonStorageService {
     return {
       "customers": [],
       "inventoryTypes": [],
+      "units": [],
+      "itemTypes": [],
       "orderItems": [],
-      "expenseTypes": []
+      "expenseTypes": [],
     };
   }
 
@@ -54,5 +58,10 @@ class JsonStorageService {
     allData[field] = data;
     final file = await _getLocalFile();
     await file.writeAsString(jsonEncode(allData));
+  }
+
+  Future<void> saveMasterData(Map<String, dynamic> data) async {
+    final file = await _getLocalFile();
+    await file.writeAsString(jsonEncode(data));
   }
 }

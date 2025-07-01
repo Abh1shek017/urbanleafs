@@ -46,7 +46,9 @@ class ExpenseListScreen extends ConsumerWidget {
                     Text("Type: ${expense.type.capitalize()}"),
                     Text("Added at: ${FormatUtils.formatTime(expense.addedAt)} by ${expense.addedBy}"),
                     if (expense.editedAt != null)
-                      Text("Edited at: ${FormatUtils.formatTime(expense.editedAt!)} by ${expense.editedBy}"),
+                      Text(
+                        "Edited at: ${FormatUtils.formatTime(expense.editedAt!)} by ${expense.editedBy}",
+                      ),
                   ],
                 ),
                 trailing: IconButton(

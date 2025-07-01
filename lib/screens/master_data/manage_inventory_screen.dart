@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../services/json_storage_service.dart';
+import '../../services/master_data_service.dart';
 import '../../widgets/glass_cards.dart';
 import '../../utils/staggered_animation.dart';
+import '../../widgets/admin_checker.dart';
+import '../../utils/unique_list_utils.dart';
 
 class ManageInventoryScreen extends StatefulWidget {
   const ManageInventoryScreen({super.key});
@@ -12,27 +14,40 @@ class ManageInventoryScreen extends StatefulWidget {
 
 class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     with SingleTickerProviderStateMixin {
-  final JsonStorageService _service = JsonStorageService();
+  final MasterDataService _service = MasterDataService();
 
   List<dynamic> _inventoryTypes = [];
   List<dynamic> _units = [];
   List<dynamic> _itemTypes = [];
 
   late TabController _tabController;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadData();
+    _loadLocalData();
   }
 
-  Future<void> _loadData() async {
-    final data = await _service.getMasterData();
+  Future<void> _loadLocalData() async {
+    final data = await _service.loadLocalMasterData();
     setState(() {
-      _inventoryTypes = data['inventoryTypes'] ?? [];
-      _units = data['units'] ?? [];
-      _itemTypes = data['itemTypes'] ?? [];
+      _inventoryTypes = UniqueListUtils.safeUniqueStringList(data['inventoryTypes']);
+      _units = UniqueListUtils.safeUniqueStringList(data['units']);
+      _itemTypes = UniqueListUtils.safeUniqueStringList(data['itemTypes']);
+      _loading = false;
+    });
+  }
+
+  Future<void> _refreshFromFirestore() async {
+    setState(() => _loading = true);
+    final data = await _service.fetchAndUpdateFromFirestore();
+    setState(() {
+        _inventoryTypes = UniqueListUtils.safeUniqueStringList(data['inventoryTypes']);
+      _units = UniqueListUtils.safeUniqueStringList(data['units']);
+      _itemTypes = UniqueListUtils.safeUniqueStringList(data['itemTypes']);
+      _loading = false;
     });
   }
 
@@ -52,15 +67,17 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final newItem = controller.text.trim();
               if (newItem.isNotEmpty) {
                 setState(() {
                   list.add(newItem);
                 });
-                _service.updateMasterDataField(field, list);
+                final data = await _service.loadLocalMasterData();
+                data[field] = list;
+                await _service.updateMasterField(field, list);
               }
-              Navigator.pop(ctx);
+              if (mounted) Navigator.pop(ctx);
             },
             child: const Text("Add"),
           ),
@@ -69,49 +86,60 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     );
   }
 
-  void _deleteItem(String field, List<dynamic> list, int index) {
+  void _deleteItem(String field, List<dynamic> list, int index) async {
     setState(() => list.removeAt(index));
-    _service.updateMasterDataField(field, list);
+    await _service.updateMasterField(field, list);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Manage Inventory Master Data"),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: "Items"),
-            Tab(text: "Units"),
-            Tab(text: "Types"),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          final idx = _tabController.index;
-          if (idx == 0) _addItemDialog('inventoryTypes', _inventoryTypes);
-          if (idx == 1) _addItemDialog('units', _units);
-          if (idx == 2) _addItemDialog('itemTypes', _itemTypes);
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildList('inventoryTypes', _inventoryTypes),
-            _buildList('units', _units),
-            _buildList('itemTypes', _itemTypes),
-          ],
-        ),
-      ),
+    return AdminChecker(
+      builder: (context, isAdmin) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("Manage Inventory Master Data"),
+            bottom: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: "Items"),
+                Tab(text: "Units"),
+                Tab(text: "Types"),
+              ],
+            ),
+          ),
+          floatingActionButton: isAdmin
+              ? FloatingActionButton(
+                  onPressed: () {
+                    final idx = _tabController.index;
+                    if (idx == 0) _addItemDialog('inventoryTypes', _inventoryTypes);
+                    if (idx == 1) _addItemDialog('units', _units);
+                    if (idx == 2) _addItemDialog('itemTypes', _itemTypes);
+                  },
+                  child: const Icon(Icons.add),
+                )
+              : null,
+          body: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                  onRefresh: isAdmin ? _refreshFromFirestore : () async {},
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildList('inventoryTypes', _inventoryTypes, isAdmin),
+                        _buildList('units', _units, isAdmin),
+                        _buildList('itemTypes', _itemTypes, isAdmin),
+                      ],
+                    ),
+                  ),
+                ),
+        );
+      },
     );
   }
 
-  Widget _buildList(String field, List<dynamic> list) {
+  Widget _buildList(String field, List<dynamic> list, bool isAdmin) {
     if (list.isEmpty) {
       return Center(child: Text("No $field found. Add some!"));
     }
@@ -121,15 +149,18 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
       itemBuilder: (ctx, i) => StaggeredItem(
         index: i,
         child: GlassCard(
-          onTap: () => _deleteItem(field, list, i),
+          onTap: isAdmin ? () => _deleteItem(field, list, i) : null,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                list[i],
-                style: Theme.of(context).textTheme.bodyLarge,
+              Expanded(
+                child: Text(
+                  list[i],
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
               ),
-              const Icon(Icons.delete_outline, color: Colors.red),
+              if (isAdmin)
+                const Icon(Icons.delete_outline, color: Colors.red),
             ],
           ),
         ),

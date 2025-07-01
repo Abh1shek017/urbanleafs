@@ -4,27 +4,43 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/app_constants.dart';
 import '../../models/expense_model.dart';
 import '../../viewmodels/expense_viewmodel.dart';
-import '../../services/json_storage_service.dart';
+import '../../services/master_data_service.dart';
 import '../../utils/notifications_util.dart';
 
-/// Show Add Expense Dialog (Bottom Sheet)
+/// 🔥 Utility to load expense types safely from master data
+Future<List<String>> _loadExpenseTypes() async {
+  final masterDataService = MasterDataService();
+  final masterData = await masterDataService.loadLocalMasterData();
+
+  final raw = masterData['expenseTypes'];
+  List<String> types;
+
+  if (raw is List) {
+    types = raw.map((e) => e.toString()).toList();
+  } else if (raw is Map) {
+    types = raw.values.map((e) => e.toString()).toList();
+  } else {
+    types = [];
+  }
+
+  return types.isNotEmpty
+      ? types
+      : [
+          AppConstants.expenseRawMaterial,
+          AppConstants.expenseTransportation,
+          AppConstants.expenseLabor,
+          AppConstants.expenseOther,
+        ];
+}
+
+/// Show Add Expense Bottom Sheet
 void showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
   final formKey = GlobalKey<FormState>();
   String? description;
   double? amount;
-  String? type;
 
-  // 🔥 Load expense types from JSON storage
-  final jsonService = JsonStorageService();
-  final masterData = await jsonService.getMasterData();
-  final expenseTypes = masterData['expenseTypes'] ?? [
-    AppConstants.expenseRawMaterial,
-    AppConstants.expenseTransportation,
-    AppConstants.expenseLabor,
-    AppConstants.expenseOther,
-  ];
-
-  type = expenseTypes.isNotEmpty ? expenseTypes.first.toString() : AppConstants.expenseOther;
+  final expenseTypes = await _loadExpenseTypes();
+  String type = expenseTypes.first;
 
   showModalBottomSheet(
     context: context,
@@ -41,67 +57,75 @@ void showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Add New Expense", style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                "Add New Expense",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 decoration: const InputDecoration(labelText: "Description"),
-                validator: (value) => value?.isEmpty ?? true ? "Required" : null,
-                onSaved: (value) => description = value,
+                validator: (value) =>
+                    value?.trim().isEmpty ?? true ? "Required" : null,
+                onSaved: (value) => description = value?.trim(),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: "Amount (₹)"),
                 validator: (value) {
-                  if ((value?.isEmpty ?? true) || double.tryParse(value!) == null) {
-                    return "Enter valid amount";
+                  if (value == null || value.trim().isEmpty) {
+                    return "Enter amount";
+                  }
+                  if (double.tryParse(value) == null) {
+                    return "Invalid number";
                   }
                   return null;
                 },
-                onSaved: (value) => amount = double.parse(value!),
+                onSaved: (value) => amount = double.parse(value!.trim()),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: type,
                 decoration: const InputDecoration(labelText: "Expense Type"),
-                items: expenseTypes.map((et) {
-                  return DropdownMenuItem(
-                    value: et.toString(),
-                    child: Text(et.toString()),
-                  );
-                }).toList(),
-                onChanged: (val) => type = val,
-                validator: (val) => val == null || val.isEmpty ? 'Select type' : null,
+                items: expenseTypes
+                    .map((et) =>
+                        DropdownMenuItem(value: et, child: Text(et)))
+                    .toList(),
+                onChanged: (val) => type = val ?? type,
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Select type' : null,
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 icon: const Icon(Icons.check),
                 label: const Text("Add Expense"),
-                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                ),
                 onPressed: () async {
                   if (formKey.currentState!.validate()) {
                     formKey.currentState!.save();
-                    final currentContext = context;
-                    final userId = "temp_user_id"; // Replace with actual user ID
                     final expenseData = {
                       'description': description!,
                       'amount': amount!,
-                      'type': type!,
+                      'type': type,
                       'date': Timestamp.now(),
-                      'addedBy': userId,
+                      'addedBy': "temp_user_id",
                       'addedAt': Timestamp.now(),
                     };
 
                     try {
-                      await ref.read(markExpenseFutureProvider(expenseData).future);
+                      await ref
+                          .read(markExpenseFutureProvider(expenseData).future);
                       await addNotification(
                         title: 'New Expense',
-                        body: '$description ₹${amount!.toStringAsFixed(2)} ($type)',
+                        body:
+                            '$description ₹${amount!.toStringAsFixed(2)} ($type)',
                       );
-                      if (currentContext.mounted) Navigator.of(currentContext).pop();
+                      if (context.mounted) Navigator.of(context).pop();
                     } catch (e) {
-                      if (currentContext.mounted) {
-                        ScaffoldMessenger.of(currentContext).showSnackBar(
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text("Failed to add expense: $e")),
                         );
                       }
@@ -118,7 +142,7 @@ void showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
   );
 }
 
-/// Show Edit Expense Dialog (Bottom Sheet)
+/// Show Edit Expense Bottom Sheet
 void showEditExpenseDialog(
   BuildContext context,
   ExpenseModel expense,
@@ -127,19 +151,9 @@ void showEditExpenseDialog(
   final formKey = GlobalKey<FormState>();
   String updatedDescription = expense.description;
   double updatedAmount = expense.amount;
-  String? updatedType = expense.type;
 
-  // 🔥 Load expense types from JSON storage
-  final jsonService = JsonStorageService();
-  final masterData = await jsonService.getMasterData();
-  final expenseTypes = masterData['expenseTypes'] ?? [
-    AppConstants.expenseRawMaterial,
-    AppConstants.expenseTransportation,
-    AppConstants.expenseLabor,
-    AppConstants.expenseOther,
-  ];
-
-  updatedType ??= expenseTypes.isNotEmpty ? expenseTypes.first.toString() : AppConstants.expenseOther;
+  final expenseTypes = await _loadExpenseTypes();
+  String updatedType = expense.type ?? expenseTypes.first;
 
   showModalBottomSheet(
     context: context,
@@ -156,13 +170,18 @@ void showEditExpenseDialog(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Edit Expense", style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                "Edit Expense",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 initialValue: updatedDescription,
                 decoration: const InputDecoration(labelText: "Description"),
-                validator: (value) => value?.isEmpty ?? true ? "Required" : null,
-                onSaved: (value) => updatedDescription = value ?? updatedDescription,
+                validator: (value) =>
+                    value?.trim().isEmpty ?? true ? "Required" : null,
+                onSaved: (value) =>
+                    updatedDescription = value?.trim() ?? updatedDescription,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -170,58 +189,66 @@ void showEditExpenseDialog(
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: "Amount (₹)"),
                 validator: (value) {
-                  if ((value?.isEmpty ?? true) || double.tryParse(value!) == null) {
-                    return "Enter valid amount";
+                  if (value == null || value.trim().isEmpty) {
+                    return "Enter amount";
+                  }
+                  if (double.tryParse(value) == null) {
+                    return "Invalid number";
                   }
                   return null;
                 },
-                onSaved: (value) => updatedAmount = double.parse(value!),
+                onSaved: (value) =>
+                    updatedAmount = double.parse(value!.trim()),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: updatedType,
                 decoration: const InputDecoration(labelText: "Expense Type"),
-                items: expenseTypes.map((et) {
-                  return DropdownMenuItem(
-                    value: et.toString(),
-                    child: Text(et.toString()),
-                  );
-                }).toList(),
-                onChanged: (val) => updatedType = val,
-                validator: (val) => val == null || val.isEmpty ? 'Select type' : null,
+                items: expenseTypes
+                    .map((et) =>
+                        DropdownMenuItem(value: et, child: Text(et)))
+                    .toList(),
+                onChanged: (val) => updatedType = val ?? updatedType,
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Select type' : null,
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 icon: const Icon(Icons.save),
                 label: const Text("Update Expense"),
-                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                ),
                 onPressed: () async {
                   if (formKey.currentState!.validate()) {
                     formKey.currentState!.save();
-                    final currentContext = context;
-                    final userId = "temp_user_id"; // Replace with actual user ID
                     final updatedData = {
                       'description': updatedDescription,
                       'amount': updatedAmount,
-                      'type': updatedType!,
-                      'editedBy': userId,
+                      'type': updatedType,
+                      'editedBy': "temp_user_id",
                       'editedAt': Timestamp.now(),
                     };
 
                     try {
-                      await ref.read(updateExpenseFutureProvider({
-                        'id': expense.id,
-                        'data': updatedData,
-                      }).future);
+                      await ref.read(
+                        updateExpenseFutureProvider({
+                          'id': expense.id,
+                          'data': updatedData,
+                        }).future,
+                      );
                       await addNotification(
                         title: 'Expense Updated',
-                        body: '$updatedDescription ₹${updatedAmount.toStringAsFixed(2)} ($updatedType)',
+                        body:
+                            '$updatedDescription ₹${updatedAmount.toStringAsFixed(2)} ($updatedType)',
                       );
-                      if (currentContext.mounted) Navigator.of(currentContext).pop();
+                      if (context.mounted) Navigator.of(context).pop();
                     } catch (e) {
-                      if (currentContext.mounted) {
-                        ScaffoldMessenger.of(currentContext).showSnackBar(
-                          SnackBar(content: Text("Failed to update expense: $e")),
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Failed to update expense: $e"),
+                          ),
                         );
                       }
                     }
