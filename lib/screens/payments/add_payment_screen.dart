@@ -22,6 +22,7 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
   final masterDataService = MasterDataService();
   List<String> _customerList = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -29,58 +30,102 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
     _loadCustomers();
   }
 
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadCustomers() async {
-    final customersData = await masterDataService.loadLocalMasterData();
-    final rawCustomers = customersData['customers'];
+    try {
+      final customersData = await masterDataService.loadLocalMasterData();
+      final rawCustomers = customersData['customers'];
 
-    List<String> customers;
+      List<String> customers;
 
-    if (rawCustomers is List) {
-      customers = rawCustomers.map((e) => e.toString()).toList();
-    } else if (rawCustomers is Map) {
-      customers = rawCustomers.values.map((e) => e.toString()).toList();
-    } else {
-      customers = [];
+      if (rawCustomers is List) {
+        customers = rawCustomers.map((e) => e.toString()).toList();
+      } else if (rawCustomers is Map) {
+        customers = rawCustomers.values.map((e) => e.toString()).toList();
+      } else {
+        customers = [];
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _customerList = customers;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
     }
-
-    if (!mounted) return;
-    setState(() {
-      _customerList = customers;
-      _loading = false;
-    });
   }
 
   void _submitPayment() async {
     if (_formKey.currentState!.validate()) {
-      final amount = double.parse(_amountController.text.trim());
-      final repo = ref.read(paymentRepositoryProvider);
+      if (_selectedCustomer == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a customer')),
+        );
+        return;
+      }
 
-      await repo.addPayment({
-        'amount': amount,
-        'customerName': _selectedCustomer!,
-        'receivedTime': DateTime.now(),
-        'receivedBy': widget.userId,
-        'type': _paymentType,
-      });
+      final amountText = _amountController.text.trim();
+      if (amountText.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please enter an amount')));
+        return;
+      }
 
-      await ref.read(
-        createNotificationProvider({
-          'title': 'Payment Received',
-          'body':
-              '₹${amount.toStringAsFixed(2)} from $_selectedCustomer ($_paymentType)',
-        }),
-      );
+      final amount = double.tryParse(amountText);
+      if (amount == null || amount <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid amount')),
+        );
+        return;
+      }
 
-      if (!mounted) return;
-      setState(() {
-        _amountController.clear();
-        _selectedCustomer = null;
-        _paymentType = AppConstants.paymentCash;
-      });
+      try {
+        final repo = ref.read(paymentRepositoryProvider);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment added successfully')),
-      );
+        await repo.addPayment({
+          'amount': amount,
+          'customerName': _selectedCustomer!,
+          'receivedTime': DateTime.now(),
+          'receivedBy': widget.userId,
+          'type': _paymentType,
+        });
+
+        ref.read(
+          createNotificationProvider({
+            'title': 'Payment Received',
+            'body':
+                '₹${amount.toStringAsFixed(2)} from $_selectedCustomer ($_paymentType)',
+          }),
+        );
+
+        if (!mounted) return;
+        setState(() {
+          _amountController.clear();
+          _selectedCustomer = null;
+          _paymentType = AppConstants.paymentCash;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment added successfully')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to add payment: $e')));
+      }
     }
   }
 
@@ -96,25 +141,39 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
           key: _formKey,
           child: Column(
             children: [
-              _loading
-                  ? const LinearProgressIndicator()
-                  : DropdownButtonFormField<String>(
-                      value: _selectedCustomer,
-                      hint: const Text("Select Customer"),
-                      items: _customerList
-                          .map((name) => DropdownMenuItem(
-                                value: name,
-                                child: Text(name),
-                              ))
-                          .toList(),
-                      onChanged: (val) =>
-                          setState(() => _selectedCustomer = val),
-                      validator: (val) =>
-                          val == null || val.isEmpty ? 'Select a customer' : null,
-                      decoration: const InputDecoration(
-                        labelText: 'Customer Name',
-                      ),
+              if (_loading)
+                const LinearProgressIndicator()
+              else if (_error != null)
+                Column(
+                  children: [
+                    Text(
+                      'Error: $_error',
+                      style: const TextStyle(color: Colors.red),
                     ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: _loadCustomers,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                )
+              else if (_customerList.isEmpty)
+                const Text('No customers available')
+              else
+                DropdownButtonFormField<String>(
+                  value: _selectedCustomer,
+                  hint: const Text("Select Customer"),
+                  items: _customerList
+                      .map(
+                        (name) =>
+                            DropdownMenuItem(value: name, child: Text(name)),
+                      )
+                      .toList(),
+                  onChanged: (val) => setState(() => _selectedCustomer = val),
+                  validator: (val) =>
+                      val == null || val.isEmpty ? 'Select a customer' : null,
+                  decoration: const InputDecoration(labelText: 'Customer Name'),
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -130,8 +189,9 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
                         if (val == null || val.isEmpty) {
                           return 'Enter amount';
                         }
-                        if (double.tryParse(val) == null) {
-                          return 'Invalid number';
+                        final parsed = double.tryParse(val.trim());
+                        if (parsed == null || parsed <= 0) {
+                          return 'Enter a valid amount';
                         }
                         return null;
                       },
@@ -141,14 +201,18 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: _paymentType,
-                      items: [AppConstants.paymentCash, AppConstants.paymentOnline]
-                          .map((type) => DropdownMenuItem(
-                                value: type,
-                                child: Text(type),
-                              ))
-                          .toList(),
-                      onChanged: (val) =>
-                          setState(() => _paymentType = val ?? AppConstants.paymentCash),
+                      items:
+                          [AppConstants.paymentCash, AppConstants.paymentOnline]
+                              .map(
+                                (type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(type),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (val) => setState(
+                        () => _paymentType = val ?? AppConstants.paymentCash,
+                      ),
                       decoration: const InputDecoration(labelText: 'Mode'),
                     ),
                   ),
@@ -156,7 +220,9 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _loading ? null : _submitPayment,
+                onPressed: _loading || _error != null || _customerList.isEmpty
+                    ? null
+                    : _submitPayment,
                 child: const Text('Add Payment'),
               ),
             ],

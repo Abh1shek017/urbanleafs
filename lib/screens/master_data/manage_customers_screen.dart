@@ -27,7 +27,11 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     final customers = UniqueListUtils.safeUniqueStringList(data['customers']);
     if (customers.isEmpty) {
       final fresh = await _service.fetchAndUpdateFromFirestore();
-      setState(() => _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']));
+      setState(
+        () => _customers = UniqueListUtils.safeUniqueStringList(
+          fresh['customers'],
+        ),
+      );
     } else {
       setState(() => _customers = customers);
     }
@@ -35,39 +39,66 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
   Future<void> _pullRefresh() async {
     final fresh = await _service.fetchAndUpdateFromFirestore();
-    setState(() => _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']));
+    setState(
+      () =>
+          _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']),
+    );
   }
+void _addCustomer() async {
+  final nameCtrl = TextEditingController();
+  final phoneCtrl = TextEditingController();
 
-  void _addCustomer() async {
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Add Customer"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Name")),
-            TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: "Phone")),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              final newCustomer = "${nameCtrl.text.trim()} (${phoneCtrl.text.trim()})";
-              setState(() => _customers.add(newCustomer));
-              await _service.updateMasterField('customers', _customers);
-              await _loadData();
-              if (mounted) Navigator.pop(ctx);
-            },
-            child: const Text("Add"),
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text("Add Customer"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: "Name"),
+          ),
+          TextField(
+            controller: phoneCtrl,
+            decoration: const InputDecoration(labelText: "Phone"),
           ),
         ],
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final newCustomer =
+                "${nameCtrl.text.trim()} (${phoneCtrl.text.trim()})";
+
+            // ✅ 1. Write directly to Firestore
+            await _service.updateFirestoreFieldArray(
+              'customers',
+              newCustomer,
+            );
+
+            // ✅ 2. Fetch latest data from Firestore and update local JSON
+            final fresh = await _service.fetchAndUpdateFromFirestore();
+
+            // ✅ 3. Reload local JSON into UI
+            setState(() {
+              _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']);
+            });
+
+            if (!context.mounted) return;
+            Navigator.pop(ctx);
+          },
+          child: const Text("Add"),
+        ),
+      ],
+    ),
+  );
+}
+
 
   void _deleteCustomer(int index) async {
     setState(() => _customers.removeAt(index));
@@ -81,9 +112,12 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
       builder: (context, isAdmin) {
         return Scaffold(
           appBar: AppBar(title: const Text("Manage Customers")),
-          floatingActionButton: isAdmin 
-            ? FloatingActionButton(onPressed: _addCustomer, child: const Icon(Icons.add))
-            : null,
+          floatingActionButton: isAdmin
+              ? FloatingActionButton(
+                  onPressed: _addCustomer,
+                  child: const Icon(Icons.add),
+                )
+              : null,
           body: RefreshIndicator(
             onRefresh: isAdmin ? _pullRefresh : () async {},
             child: Padding(
@@ -97,7 +131,10 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(_customers[i], style: Theme.of(context).textTheme.bodyLarge),
+                        Text(
+                          _customers[i],
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
                         if (isAdmin)
                           const Icon(Icons.delete_outline, color: Colors.red),
                       ],

@@ -29,4 +29,15 @@ class MasterDataService {
     await docRef.set({field: value}, SetOptions(merge: true));
     await fetchAndUpdateFromFirestore(); // refresh local cache with latest
   }
+  Future<void> updateFirestoreFieldArray(String field, String newValue) async {
+  final docRef = _firestore.collection('masterData').doc('global');
+
+  await docRef.update({
+    field: FieldValue.arrayUnion([newValue])
+  });
+
+  // Optionally also update your local JSON after updating Firestore
+  final freshData = await fetchAndUpdateFromFirestore();
+  await updateLocalMasterData(freshData);
+}
 }

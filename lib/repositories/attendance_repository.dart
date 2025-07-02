@@ -159,7 +159,7 @@ class AttendanceRepository extends BaseRepository {
       });
     } catch (e) {
       // Don't fail attendance marking if notification fails
-      print('Failed to create attendance notification: $e');
+      // print('Failed to create attendance notification: $e');
     }
   }
 

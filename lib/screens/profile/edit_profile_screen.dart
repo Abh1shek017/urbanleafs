@@ -39,10 +39,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       source: ImageSource.gallery,
       imageQuality: 75,
     );
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
+    if (pickedFile != null && mounted) {
+      setState(() => _imageFile = File(pickedFile.path));
     }
   }
 
@@ -57,10 +55,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final uploadTask = await ref.putFile(file);
       return await uploadTask.ref.getDownloadURL();
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Image upload failed: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Image upload failed: $e")),
+        );
       }
       return null;
     }
@@ -73,13 +71,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     return userAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) => Scaffold(body: Center(child: Text("Error: $err"))),
+      error: (err, stack) =>
+          Scaffold(body: Center(child: Text("Error: $err"))),
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text("User not found")));
+          return const Scaffold(
+              body: Center(child: Text("User not found")));
         }
 
-        if (_nameController.text.isEmpty) _nameController.text = user.username;
+        if (_nameController.text.isEmpty) {
+          _nameController.text = user.username;
+        }
 
         return Scaffold(
           appBar: AppBar(
@@ -103,7 +105,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withValues(alpha: 0.2),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),
@@ -115,18 +117,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             backgroundImage: _imageFile != null
                                 ? FileImage(_imageFile!)
                                 : (user.profileImageUrl != null &&
-                                      user.profileImageUrl?.isNotEmpty == true)
-                                ? NetworkImage(user.profileImageUrl!)
-                                : null as ImageProvider?,
-                            child:
-                                (_imageFile == null &&
+                                        user.profileImageUrl!.isNotEmpty)
+                                    ? NetworkImage(user.profileImageUrl!)
+                                    : null,
+                            child: (_imageFile == null &&
                                     (user.profileImageUrl == null ||
-                                        user.profileImageUrl?.isEmpty == true))
-                                ? const Icon(
-                                    Icons.person,
-                                    size: 50,
-                                    color: Colors.grey,
-                                  )
+                                        user.profileImageUrl!.isEmpty))
+                                ? const Icon(Icons.person,
+                                    size: 50, color: Colors.grey)
                                 : null,
                           ),
                         ),
@@ -141,20 +139,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 color: Colors.blue,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.blueAccent.withValues(
-                                      alpha: 0.4,
-                                    ),
+                                    color: Colors.blue.withValues(alpha: 0.4),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
                               padding: const EdgeInsets.all(8),
-                              child: const Icon(
-                                Icons.edit,
-                                color: Colors.white,
-                                size: 20,
-                              ),
+                              child: const Icon(Icons.edit,
+                                  color: Colors.white, size: 20),
                             ),
                           ),
                         ),
@@ -162,10 +155,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    "Edit your personal details",
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text("Edit your personal details",
+                      style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _nameController,
@@ -184,9 +175,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           onPressed: () async {
                             if (_formKey.currentState?.validate() ?? false) {
                               setState(() => _isSaving = true);
-                              final repository = ref.read(
-                                userRepositoryProvider,
-                              );
+                              final repository = ref.read(userRepositoryProvider);
                               final auth = ref.read(authStateProvider).value;
                               if (auth != null) {
                                 try {
@@ -204,16 +193,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                     }
                                   }
 
-                                  await repository.updateUser(
-                                    auth.uid,
-                                    updateData,
-                                  );
+                                  await repository.updateUser(auth.uid, updateData);
 
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text("Profile updated"),
-                                      ),
+                                          content: Text("Profile updated")),
                                     );
                                     Navigator.pop(context);
                                   }

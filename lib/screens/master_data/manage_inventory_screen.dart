@@ -16,9 +16,9 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     with SingleTickerProviderStateMixin {
   final MasterDataService _service = MasterDataService();
 
-  List<dynamic> _inventoryTypes = [];
-  List<dynamic> _units = [];
-  List<dynamic> _itemTypes = [];
+  List<String> _inventoryTypes = [];
+  List<String> _units = [];
+  List<String> _itemTypes = [];
 
   late TabController _tabController;
   bool _loading = true;
@@ -32,6 +32,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
 
   Future<void> _loadLocalData() async {
     final data = await _service.loadLocalMasterData();
+    if (!mounted) return;
     setState(() {
       _inventoryTypes = UniqueListUtils.safeUniqueStringList(data['inventoryTypes']);
       _units = UniqueListUtils.safeUniqueStringList(data['units']);
@@ -43,15 +44,16 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
   Future<void> _refreshFromFirestore() async {
     setState(() => _loading = true);
     final data = await _service.fetchAndUpdateFromFirestore();
+    if (!mounted) return;
     setState(() {
-        _inventoryTypes = UniqueListUtils.safeUniqueStringList(data['inventoryTypes']);
+      _inventoryTypes = UniqueListUtils.safeUniqueStringList(data['inventoryTypes']);
       _units = UniqueListUtils.safeUniqueStringList(data['units']);
       _itemTypes = UniqueListUtils.safeUniqueStringList(data['itemTypes']);
       _loading = false;
     });
   }
 
-  Future<void> _addItemDialog(String field, List<dynamic> list) async {
+  Future<void> _addItemDialog(String field, List<String> list) async {
     final controller = TextEditingController();
     await showDialog(
       context: context,
@@ -63,21 +65,19 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () {
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
             child: const Text("Cancel"),
           ),
           ElevatedButton(
             onPressed: () async {
               final newItem = controller.text.trim();
-              if (newItem.isNotEmpty) {
-                setState(() {
-                  list.add(newItem);
-                });
-                final data = await _service.loadLocalMasterData();
-                data[field] = list;
+              if (newItem.isNotEmpty && !list.contains(newItem)) {
+                setState(() => list.add(newItem));
                 await _service.updateMasterField(field, list);
               }
-              if (mounted) Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text("Add"),
           ),
@@ -86,7 +86,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     );
   }
 
-  void _deleteItem(String field, List<dynamic> list, int index) async {
+  void _deleteItem(String field, List<String> list, int index) async {
     setState(() => list.removeAt(index));
     await _service.updateMasterField(field, list);
   }
@@ -139,9 +139,9 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     );
   }
 
-  Widget _buildList(String field, List<dynamic> list, bool isAdmin) {
+  Widget _buildList(String field, List<String> list, bool isAdmin) {
     if (list.isEmpty) {
-      return Center(child: Text("No $field found. Add some!"));
+      return Center(child: Text("No ${field.capitalize()} found. Add some!"));
     }
 
     return ListView.builder(

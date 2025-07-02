@@ -22,20 +22,20 @@ class GlassCard extends StatelessWidget {
               gradient: LinearGradient(
                 colors: isDark
                     ? [
-                        Colors.white.withOpacity(0.05),
-                        Colors.white.withOpacity(0.02),
+                        Colors.white.withValues(alpha: 0.05),
+                        Colors.white.withValues(alpha: 0.02),
                       ]
                     : [
-                        Colors.white.withOpacity(0.25),
-                        Colors.white.withOpacity(0.1),
+                        Colors.white.withValues(alpha: 0.25),
+                        Colors.white.withValues(alpha: 0.1),
                       ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               border: Border.all(
                 color: isDark
-                    ? Colors.white.withOpacity(0.15)
-                    : Colors.black.withOpacity(0.1),
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.1),
               ),
               borderRadius: BorderRadius.circular(20),
             ),

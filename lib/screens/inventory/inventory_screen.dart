@@ -7,7 +7,6 @@ import '../../providers/auth_provider.dart';
 import '../../models/inventory_model.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../providers/user_provider.dart';
-import '../../services/json_storage_service.dart';
 import '../../services/master_data_service.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
@@ -24,6 +23,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
   List<String> units = [];
   List<String> itemTypes = [];
   bool _loading = true;
+  String? _error;
 
   @override
   bool get wantKeepAlive => true;
@@ -35,17 +35,31 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
   }
 
   Future<void> _loadMasterData() async {
-    final data = await masterDataService.loadLocalMasterData();
-    setState(() {
-      itemNames = (data['inventoryTypes'] ?? [])
-          .map<String>((e) => e.toString())
-          .toList();
-      units = (data['units'] ?? []).map<String>((e) => e.toString()).toList();
-      itemTypes = (data['itemTypes'] ?? [])
-          .map<String>((e) => e.toString())
-          .toList();
-      _loading = false;
-    });
+    try {
+      final data = await masterDataService.loadLocalMasterData();
+      if (mounted) {
+        setState(() {
+          itemNames = (data['inventoryTypes'] ?? [])
+              .map<String>((e) => e.toString())
+              .toList();
+          units = (data['units'] ?? [])
+              .map<String>((e) => e.toString())
+              .toList();
+          itemTypes = (data['itemTypes'] ?? [])
+              .map<String>((e) => e.toString())
+              .toList();
+          _loading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.toString();
+        });
+      }
+    }
   }
 
   @override
@@ -58,9 +72,35 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
       appBar: AppBar(title: const Text("Inventory Status")),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Error: $_error'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadMasterData,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
           : inventoryAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err')),
+              error: (err, _) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Error: $err'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => ref.invalidate(inventoryStreamProvider),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
               data: (items) {
                 if (items.isEmpty) {
                   return const Center(child: Text('No inventory items found.'));
@@ -86,10 +126,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                       child: ListTile(
                         title: Row(
                           children: [
-                            Text(
-                              item.itemName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Text(
+                                item.itemName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -156,6 +198,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     required String userId,
     InventoryModel? item,
   }) {
+    if (itemNames.isEmpty || units.isEmpty || itemTypes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please wait for data to load")),
+      );
+      return;
+    }
+
     final formKey = GlobalKey<FormState>();
     String? itemName = item?.itemName;
     int quantity = item?.quantity ?? 0;
@@ -198,7 +247,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                   keyboardType: TextInputType.number,
                   validator: (val) {
                     if (val == null || val.isEmpty) return 'Required';
-                    if (int.tryParse(val) == null) return 'Invalid number';
+                    final parsed = int.tryParse(val.trim());
+                    if (parsed == null || parsed < 0) return 'Invalid number';
                     return null;
                   },
                   onSaved: (val) => quantity = int.parse(val!),
@@ -239,6 +289,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                     labelText: 'Low Stock Threshold',
                   ),
                   keyboardType: TextInputType.number,
+                  validator: (val) {
+                    if (val == null || val.isEmpty) return 'Required';
+                    final parsed = int.tryParse(val.trim());
+                    if (parsed == null || parsed < 0) return 'Invalid number';
+                    return null;
+                  },
                   onSaved: (val) =>
                       lowStockThreshold = int.tryParse(val ?? '') ?? 10,
                 ),
@@ -248,32 +304,49 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                     if (formKey.currentState!.validate()) {
                       formKey.currentState!.save();
 
-                      final repo = InventoryRepository();
-                      final data = {
-                        'itemName': itemName,
-                        'quantity': quantity,
-                        'unit': unit,
-                        'type': type,
-                        'lowStockThreshold': lowStockThreshold,
-                        'lastUpdated': Timestamp.now(),
-                        'updatedBy': userId,
-                      };
-
-                      if (isEdit) {
-                        await repo.updateInventory(item!.id, data);
-                        await addNotification(
-                          title: 'Inventory Updated',
-                          body: '$itemName updated to $quantity $unit',
+                      if (itemName == null || unit == null || type == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Please fill all fields"),
+                          ),
                         );
-                      } else {
-                        await repo.addInventory(data);
-                        await addNotification(
-                          title: 'New Inventory Item',
-                          body: '$itemName added with $quantity $unit',
-                        );
+                        return;
                       }
 
-                      if (context.mounted) Navigator.of(context).pop();
+                      try {
+                        final repo = InventoryRepository();
+                        final data = {
+                          'itemName': itemName,
+                          'quantity': quantity,
+                          'unit': unit,
+                          'type': type,
+                          'lowStockThreshold': lowStockThreshold,
+                          'lastUpdated': Timestamp.now(),
+                          'updatedBy': userId,
+                        };
+
+                        if (isEdit) {
+                          await repo.updateInventory(item.id, data);
+                          await addNotification(
+                            title: 'Inventory Updated',
+                            body: '$itemName updated to $quantity $unit',
+                          );
+                        } else {
+                          await repo.addInventory(data);
+                          await addNotification(
+                            title: 'New Inventory Item',
+                            body: '$itemName added with $quantity $unit',
+                          );
+                        }
+                        if (!context.mounted) return;
+                        Navigator.of(context).pop();
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Failed to save: $e")),
+                          );
+                        }
+                      }
                     }
                   },
                   icon: Icon(isEdit ? Icons.save : Icons.add),

@@ -25,8 +25,11 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
   Future<void> _loadData() async {
     final data = await _service.loadLocalMasterData();
     final expenseTypes = UniqueListUtils.safeUniqueStringList(data['expenseTypes']);
+    if (!mounted) return;
+
     if (expenseTypes.isEmpty) {
-      final fresh = await _service.fetchAndUpdateFromFirestore(); // Changed from fetchAndUpdateFromFirestore
+      final fresh = await _service.fetchAndUpdateFromFirestore();
+      if (!mounted) return;
       setState(() => _expenseTypes = UniqueListUtils.safeUniqueStringList(fresh['expenseTypes']));
     } else {
       setState(() => _expenseTypes = expenseTypes);
@@ -35,6 +38,7 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
 
   Future<void> _pullRefresh() async {
     final fresh = await _service.fetchAndUpdateFromFirestore();
+    if (!mounted) return;
     setState(() => _expenseTypes = UniqueListUtils.safeUniqueStringList(fresh['expenseTypes']));
   }
 
@@ -44,15 +48,25 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Add Expense Type"),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: "Type")),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(labelText: "Type"),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
             onPressed: () async {
-              setState(() => _expenseTypes.add(ctrl.text.trim()));
+              final text = ctrl.text.trim();
+              if (text.isEmpty) return;
+
+              setState(() => _expenseTypes.add(text));
               await _service.updateMasterField('expenseTypes', _expenseTypes);
               await _loadData();
-              if (mounted) Navigator.pop(ctx);
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
             },
             child: const Text("Add"),
           ),
@@ -73,9 +87,12 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
       builder: (context, isAdmin) {
         return Scaffold(
           appBar: AppBar(title: const Text("Manage Expenses")),
-          floatingActionButton: isAdmin 
-            ? FloatingActionButton(onPressed: _addItem, child: const Icon(Icons.add))
-            : null,
+          floatingActionButton: isAdmin
+              ? FloatingActionButton(
+                  onPressed: _addItem,
+                  child: const Icon(Icons.add),
+                )
+              : null,
           body: RefreshIndicator(
             onRefresh: isAdmin ? _pullRefresh : () async {},
             child: Padding(
@@ -89,7 +106,10 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(_expenseTypes[i], style: Theme.of(context).textTheme.bodyLarge),
+                        Text(
+                          _expenseTypes[i],
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
                         if (isAdmin)
                           const Icon(Icons.delete_outline, color: Colors.red),
                       ],

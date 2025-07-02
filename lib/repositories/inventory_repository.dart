@@ -62,7 +62,7 @@ class InventoryRepository extends BaseRepository {
       }
     } catch (e) {
       // Don't fail inventory update if notification fails
-      print('Failed to create low inventory notification: $e');
+      // print('Failed to create low inventory notification: $e');
     }
   }
 }

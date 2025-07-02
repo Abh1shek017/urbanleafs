@@ -50,7 +50,7 @@ class ExpenseRepository extends BaseRepository {
       });
     } catch (e) {
       // Don't fail expense creation if notification fails
-      print('Failed to create expense notification: $e');
+      // print('Failed to create expense notification: $e');
     }
   }
 

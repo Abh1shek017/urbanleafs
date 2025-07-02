@@ -43,7 +43,7 @@ class OrderRepository extends BaseRepository {
       });
     } catch (e) {
       // Don't fail order creation if notification fails
-      print('Failed to create order notification: $e');
+      // print('Failed to create order notification: $e');
     }
   }
 }
