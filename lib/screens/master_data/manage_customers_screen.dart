@@ -14,7 +14,7 @@ class ManageCustomersScreen extends StatefulWidget {
 
 class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   final MasterDataService _service = MasterDataService();
-  List<dynamic> _customers = [];
+  List<String> _customers = [];
 
   @override
   void initState() {
@@ -27,11 +27,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     final customers = UniqueListUtils.safeUniqueStringList(data['customers']);
     if (customers.isEmpty) {
       final fresh = await _service.fetchAndUpdateFromFirestore();
-      setState(
-        () => _customers = UniqueListUtils.safeUniqueStringList(
-          fresh['customers'],
-        ),
-      );
+      setState(() =>
+          _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']));
     } else {
       setState(() => _customers = customers);
     }
@@ -39,71 +36,112 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
   Future<void> _pullRefresh() async {
     final fresh = await _service.fetchAndUpdateFromFirestore();
-    setState(
-      () =>
-          _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']),
-    );
+    setState(() =>
+        _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']));
   }
-void _addCustomer() async {
-  final nameCtrl = TextEditingController();
-  final phoneCtrl = TextEditingController();
 
-  await showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text("Add Customer"),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: nameCtrl,
-            decoration: const InputDecoration(labelText: "Name"),
+  void _addCustomer() async {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Add Customer"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: "Name"),
+            ),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: "Phone"),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
           ),
-          TextField(
-            controller: phoneCtrl,
-            decoration: const InputDecoration(labelText: "Phone"),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              final phone = phoneCtrl.text.trim();
+
+              // ✅ Validation checks
+              if (name.isEmpty || phone.isEmpty) {
+                _showError("Name and Phone cannot be empty.");
+                return;
+              }
+
+              if (!RegExp(r'^\d+$').hasMatch(phone)) {
+                _showError("Phone number must be digits only.");
+                return;
+              }
+
+              if (phone.length < 10) {
+                _showError("Phone number must be at least 10 digits.");
+                return;
+              }
+
+              final newCustomer = "$name ($phone)";
+
+              // ✅ Duplicate check
+              final isDuplicate = _customers.any((c) =>
+                  c.toLowerCase() == newCustomer.toLowerCase());
+              if (isDuplicate) {
+                _showError("This customer already exists.");
+                return;
+              }
+
+              // ✅ Add to local + Firestore simultaneously
+              setState(() => _customers.add(newCustomer));
+              await Future.wait([
+                _service.updateFirestoreFieldArray('customers', newCustomer),
+                _service.updateMasterField('customers', _customers),
+              ]);
+
+              if (!context.mounted) return;
+              Navigator.pop(ctx);
+            },
+            child: const Text("Add"),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            final newCustomer =
-                "${nameCtrl.text.trim()} (${phoneCtrl.text.trim()})";
-
-            // ✅ 1. Write directly to Firestore
-            await _service.updateFirestoreFieldArray(
-              'customers',
-              newCustomer,
-            );
-
-            // ✅ 2. Fetch latest data from Firestore and update local JSON
-            final fresh = await _service.fetchAndUpdateFromFirestore();
-
-            // ✅ 3. Reload local JSON into UI
-            setState(() {
-              _customers = UniqueListUtils.safeUniqueStringList(fresh['customers']);
-            });
-
-            if (!context.mounted) return;
-            Navigator.pop(ctx);
-          },
-          child: const Text("Add"),
-        ),
-      ],
-    ),
-  );
-}
-
+    );
+  }
 
   void _deleteCustomer(int index) async {
+    final customerToRemove = _customers[index];
+
     setState(() => _customers.removeAt(index));
-    await _service.updateMasterField('customers', _customers);
+
+    await Future.wait([
+      _service.removeFirestoreFieldArray('customers', customerToRemove),
+      _service.updateMasterField('customers', _customers),
+    ]);
+
     await _loadData();
+  }
+
+  void _showError(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
