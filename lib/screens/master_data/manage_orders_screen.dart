@@ -70,10 +70,29 @@ class _ManageOrdersScreenState extends State<ManageOrdersScreen> {
           ElevatedButton(
             onPressed: () async {
               final newItem = ctrl.text.trim();
-              if (newItem.isNotEmpty && !_orderItems.contains(newItem)) {
-                setState(() => _orderItems.add(newItem));
-                await _service.updateMasterField('orderItems', _orderItems);
+              if (newItem.isEmpty) {
+                _showError("Value cannot be empty.");
+                return;
               }
+
+              // ✅ Case-insensitive duplicate check
+              final isDuplicate = _orderItems.any(
+                (item) => item.toLowerCase() == newItem.toLowerCase(),
+              );
+              if (isDuplicate) {
+                _showError("This item already exists.");
+                return;
+              }
+
+              final updatedList = List<String>.from(_orderItems)..add(newItem);
+
+              setState(() {
+                _orderItems = updatedList;
+              });
+
+              await _service.updateMasterField('orderItems', updatedList);
+
+              // ✅ Ensure dialog closes immediately after adding
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text("Add"),
@@ -84,8 +103,29 @@ class _ManageOrdersScreenState extends State<ManageOrdersScreen> {
   }
 
   void _deleteItem(int i) async {
-    setState(() => _orderItems.removeAt(i));
-    await _service.updateMasterField('orderItems', _orderItems);
+    final updatedList = List<String>.from(_orderItems)..removeAt(i);
+
+    setState(() {
+      _orderItems = updatedList;
+    });
+
+    await _service.updateMasterField('orderItems', updatedList);
+  }
+
+  void _showError(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
