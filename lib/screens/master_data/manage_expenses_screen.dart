@@ -14,7 +14,7 @@ class ManageExpensesScreen extends StatefulWidget {
 
 class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
   final MasterDataService _service = MasterDataService();
-  List<dynamic> _expenseTypes = [];
+  List<String> _expenseTypes = [];
 
   @override
   void initState() {
@@ -60,11 +60,30 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
           ElevatedButton(
             onPressed: () async {
               final text = ctrl.text.trim();
-              if (text.isEmpty) return;
+              if (text.isEmpty) {
+                _showError("Type cannot be empty.");
+                return;
+              }
 
-              setState(() => _expenseTypes.add(text));
-              await _service.updateMasterField('expenseTypes', _expenseTypes);
-              await _loadData();
+              // ✅ Duplicate check (case-insensitive)
+              final isDuplicate = _expenseTypes.any(
+                (type) => type.toLowerCase() == text.toLowerCase(),
+              );
+              if (isDuplicate) {
+                _showError("This expense type already exists.");
+                return;
+              }
+
+              // ✅ Clone list and add
+              final updatedList = List<String>.from(_expenseTypes)..add(text);
+
+              setState(() => _expenseTypes = updatedList);
+
+              // ✅ Write to Firestore and local JSON simultaneously
+              await Future.wait([
+                _service.updateMasterField('expenseTypes', _expenseTypes),
+              ]);
+
               if (!ctx.mounted) return;
               Navigator.pop(ctx);
             },
@@ -76,9 +95,30 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
   }
 
   void _deleteItem(int i) async {
-    setState(() => _expenseTypes.removeAt(i));
-    await _service.updateMasterField('expenseTypes', _expenseTypes);
+    final updatedList = List<String>.from(_expenseTypes)..removeAt(i);
+    setState(() => _expenseTypes = updatedList);
+
+    await Future.wait([
+      _service.updateMasterField('expenseTypes', _expenseTypes),
+    ]);
+
     await _loadData();
+  }
+
+  void _showError(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

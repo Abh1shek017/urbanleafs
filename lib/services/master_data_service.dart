@@ -22,6 +22,7 @@ class MasterDataService {
   Future<Map<String, dynamic>> fetchAndUpdateFromFirestore() async {
     final doc = await _firestore.collection('masterData').doc('global').get();
     final data = doc.data() ?? {};
+    print('Fetched Firestore data: $data');
     await updateLocalMasterData(data);
     return data;
   }
