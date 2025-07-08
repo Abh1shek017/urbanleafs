@@ -53,7 +53,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     });
   }
 
-  Future<void> _addItemDialog(String field, List<String> list) async {
+  Future<void> _addItemDialog(String field, List<String> currentList) async {
     final controller = TextEditingController();
     await showDialog(
       context: context,
@@ -65,18 +65,37 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
+            onPressed: () => Navigator.pop(ctx),
             child: const Text("Cancel"),
           ),
           ElevatedButton(
             onPressed: () async {
               final newItem = controller.text.trim();
-              if (newItem.isNotEmpty && !list.contains(newItem)) {
-                setState(() => list.add(newItem));
-                await _service.updateMasterField(field, list);
+              if (newItem.isEmpty) {
+                _showError("Value cannot be empty.");
+                return;
               }
+
+              // ✅ Case-insensitive duplicate check
+              final isDuplicate = currentList.any(
+                (item) => item.toLowerCase() == newItem.toLowerCase(),
+              );
+              if (isDuplicate) {
+                _showError("This $field already exists.");
+                return;
+              }
+
+              final updatedList = List<String>.from(currentList)..add(newItem);
+
+              setState(() {
+                if (field == 'inventoryTypes') _inventoryTypes = updatedList;
+                if (field == 'units') _units = updatedList;
+                if (field == 'itemTypes') _itemTypes = updatedList;
+              });
+
+              await _service.updateMasterField(field, updatedList);
+
+              // ✅ Ensure dialog closes immediately after adding
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text("Add"),
@@ -86,9 +105,32 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     );
   }
 
-  void _deleteItem(String field, List<String> list, int index) async {
-    setState(() => list.removeAt(index));
-    await _service.updateMasterField(field, list);
+  void _deleteItem(String field, List<String> currentList, int index) async {
+    final updatedList = List<String>.from(currentList)..removeAt(index);
+
+    setState(() {
+      if (field == 'inventoryTypes') _inventoryTypes = updatedList;
+      if (field == 'units') _units = updatedList;
+      if (field == 'itemTypes') _itemTypes = updatedList;
+    });
+
+    await _service.updateMasterField(field, updatedList);
+  }
+
+  void _showError(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
