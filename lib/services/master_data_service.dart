@@ -35,22 +35,24 @@ class MasterDataService {
   }
 
   /// Adds a single value to a Firestore array field and updates local JSON
-  Future<void> updateFirestoreFieldArray(String field, String newValue) async {
-    final docRef = _firestore.collection('masterData').doc('global');
-    await docRef.update({
-      field: FieldValue.arrayUnion([newValue])
-    });
-    final freshData = await fetchAndUpdateFromFirestore();
-    await updateLocalMasterData(freshData);
-  }
+Future<void> updateFirestoreFieldArray(String field, String newValue) async {
+  final docRef = _firestore.collection('masterData').doc('global');
+  await docRef.set({
+    field: FieldValue.arrayUnion([newValue])
+  }, SetOptions(merge: true));
+  final freshData = await fetchAndUpdateFromFirestore();
+  await updateLocalMasterData(freshData);
+}
+
 
   /// Removes a single value from a Firestore array field and updates local JSON
-  Future<void> removeFirestoreFieldArray(String field, String valueToRemove) async {
-    final docRef = _firestore.collection('masterData').doc('global');
-    await docRef.update({
-      field: FieldValue.arrayRemove([valueToRemove])
-    });
-    final freshData = await fetchAndUpdateFromFirestore();
-    await updateLocalMasterData(freshData);
-  }
+Future<void> removeFirestoreFieldArray(String field, String valueToRemove) async {
+  final docRef = _firestore.collection('masterData').doc('global');
+  await docRef.set({
+    field: FieldValue.arrayRemove([valueToRemove])
+  }, SetOptions(merge: true));
+  final freshData = await fetchAndUpdateFromFirestore();
+  await updateLocalMasterData(freshData);
+}
+
 }
