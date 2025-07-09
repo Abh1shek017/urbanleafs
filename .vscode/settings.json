@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Users/Abhishek/Desktop/UrbanLeafs/linux"
+    "cmake.sourceDirectory": "C:/Users/Abhishek/Desktop/UrbanLeafs/linux",
+    "search.useParentIgnoreFiles": true
 }

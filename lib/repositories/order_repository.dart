@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart'; // For DateUtils
 import '../models/order_model.dart';
+import '../utils/notifications_util.dart';
 import 'base_repository.dart';
 
 class OrderRepository extends BaseRepository {
@@ -28,22 +29,6 @@ class OrderRepository extends BaseRepository {
 
   /// Add a new order
   Future<void> addOrder(Map<String, dynamic> orderData) async {
-    final docRef = await collection.add(orderData);
-
-    // ✅ Create notification for new order
-    try {
-      final customerName = orderData['customerName'] ?? 'Customer';
-      final orderId = docRef.id;
-
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'title': 'New Order',
-        'body': 'Order #$orderId placed by $customerName',
-        'isRead': false,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      // Don't fail order creation if notification fails
-      // print('Failed to create order notification: $e');
-    }
+    await collection.add(orderData);
   }
 }

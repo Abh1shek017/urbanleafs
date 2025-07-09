@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart'; // For DateUtils
 import 'package:urbanleafs/constants/app_constants.dart';
 import '../models/attendance_model.dart';
+import '../utils/notifications_util.dart';
 import './base_repository.dart';
 import '../models/workers_summary_model.dart';
 import '../models/worker_model.dart';
@@ -151,12 +152,11 @@ class AttendanceRepository extends BaseRepository {
           ? (workerDoc.data() as Map<String, dynamic>)['name'] ?? 'Worker'
           : 'Worker';
 
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'title': 'Attendance Updated',
-        'body': '$workerName marked $status in $shift shift',
-        'isRead': false,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      await addNotification(
+        'attendance',
+        'Attendance Updated',
+        '$workerName marked $status in $shift shift',
+      );
     } catch (e) {
       // Don't fail attendance marking if notification fails
       // print('Failed to create attendance notification: $e');

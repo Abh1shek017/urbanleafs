@@ -69,11 +69,15 @@ void showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Add New Expense", style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                "Add New Expense",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 decoration: const InputDecoration(labelText: "Description"),
-                validator: (val) => val?.trim().isEmpty ?? true ? "Required" : null,
+                validator: (val) =>
+                    val?.trim().isEmpty ?? true ? "Required" : null,
                 onSaved: (val) => description = val?.trim(),
               ),
               const SizedBox(height: 12),
@@ -84,7 +88,9 @@ void showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
                   final trimmed = val?.trim();
                   if (trimmed == null || trimmed.isEmpty) return "Enter amount";
                   final parsed = double.tryParse(trimmed);
-                  return (parsed == null || parsed <= 0) ? "Invalid amount" : null;
+                  return (parsed == null || parsed <= 0)
+                      ? "Invalid amount"
+                      : null;
                 },
                 onSaved: (val) => amount = double.parse(val!.trim()),
               ),
@@ -92,14 +98,18 @@ void showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
               DropdownButtonFormField<String>(
                 value: type,
                 decoration: const InputDecoration(labelText: "Expense Type"),
-                items: expenseTypes.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                items: expenseTypes
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
                 onChanged: (val) => type = val ?? type,
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 icon: const Icon(Icons.check),
                 label: const Text("Add Expense"),
-                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                ),
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
                   formKey.currentState!.save();
@@ -114,8 +124,9 @@ void showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
                   try {
                     await ref.read(markExpenseFutureProvider(data).future);
                     await addNotification(
-                      title: 'New Expense',
-                      body: '$description ₹${amount!.toStringAsFixed(2)} ($type)',
+                      'expenses',
+                      'New Expense',
+                      '$description ₹${amount!.toStringAsFixed(2)} ($type)',
                     );
                     if (!context.mounted) return;
                     Navigator.of(context).pop();
@@ -136,7 +147,11 @@ void showAddExpenseDialog(BuildContext context, WidgetRef ref) async {
   );
 }
 
-void showEditExpenseDialog(BuildContext context, ExpenseModel expense, WidgetRef ref) async {
+void showEditExpenseDialog(
+  BuildContext context,
+  ExpenseModel expense,
+  WidgetRef ref,
+) async {
   final formKey = GlobalKey<FormState>();
   String updatedDescription = expense.description;
   double updatedAmount = expense.amount;
@@ -150,7 +165,9 @@ void showEditExpenseDialog(BuildContext context, ExpenseModel expense, WidgetRef
     return;
   }
 
-  String updatedType = expense.type.isNotEmpty ? expense.type : expenseTypes.first;
+  String updatedType = expense.type.isNotEmpty
+      ? expense.type
+      : expenseTypes.first;
 
   showModalBottomSheet(
     context: context,
@@ -167,13 +184,18 @@ void showEditExpenseDialog(BuildContext context, ExpenseModel expense, WidgetRef
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Edit Expense", style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                "Edit Expense",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               TextFormField(
                 initialValue: updatedDescription,
                 decoration: const InputDecoration(labelText: "Description"),
-                validator: (val) => val?.trim().isEmpty ?? true ? "Required" : null,
-                onSaved: (val) => updatedDescription = val?.trim() ?? updatedDescription,
+                validator: (val) =>
+                    val?.trim().isEmpty ?? true ? "Required" : null,
+                onSaved: (val) =>
+                    updatedDescription = val?.trim() ?? updatedDescription,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -184,7 +206,9 @@ void showEditExpenseDialog(BuildContext context, ExpenseModel expense, WidgetRef
                   final trimmed = val?.trim();
                   if (trimmed == null || trimmed.isEmpty) return "Enter amount";
                   final parsed = double.tryParse(trimmed);
-                  return (parsed == null || parsed <= 0) ? "Invalid amount" : null;
+                  return (parsed == null || parsed <= 0)
+                      ? "Invalid amount"
+                      : null;
                 },
                 onSaved: (val) => updatedAmount = double.parse(val!.trim()),
               ),
@@ -192,14 +216,18 @@ void showEditExpenseDialog(BuildContext context, ExpenseModel expense, WidgetRef
               DropdownButtonFormField<String>(
                 value: updatedType,
                 decoration: const InputDecoration(labelText: "Expense Type"),
-                items: expenseTypes.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                items: expenseTypes
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
                 onChanged: (val) => updatedType = val ?? updatedType,
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 icon: const Icon(Icons.save),
                 label: const Text("Update Expense"),
-                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                ),
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
                   formKey.currentState!.save();
@@ -211,13 +239,16 @@ void showEditExpenseDialog(BuildContext context, ExpenseModel expense, WidgetRef
                     'editedAt': Timestamp.now(),
                   };
                   try {
-                    await ref.read(updateExpenseFutureProvider({
-                      'id': expense.id,
-                      'data': data,
-                    }).future);
+                    await ref.read(
+                      updateExpenseFutureProvider({
+                        'id': expense.id,
+                        'data': data,
+                      }).future,
+                    );
                     await addNotification(
-                      title: 'Expense Updated',
-                      body: '$updatedDescription ₹${updatedAmount.toStringAsFixed(2)} ($updatedType)',
+                      'expenses',
+                      'Expense Updated',
+                      '$updatedDescription ₹${updatedAmount.toStringAsFixed(2)} ($updatedType)',
                     );
                     if (!context.mounted) return;
                     Navigator.of(context).pop();

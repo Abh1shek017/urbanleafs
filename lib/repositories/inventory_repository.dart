@@ -1,10 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/inventory_model.dart';
+import '../utils/notifications_util.dart';
 import 'base_repository.dart';
 
 class InventoryRepository extends BaseRepository {
   InventoryRepository()
-      : super(FirebaseFirestore.instance.collection('inventory'));
+    : super(FirebaseFirestore.instance.collection('inventory'));
 
   /// Stream of all inventory items (real-time)
   Stream<List<InventoryModel>> getAllInventory() {
@@ -78,17 +79,17 @@ class InventoryRepository extends BaseRepository {
   ) async {
     try {
       final quantity = inventoryData['quantity'] as int? ?? 0;
-      final lowStockThreshold = inventoryData['lowStockThreshold'] as int? ?? 10;
+      final lowStockThreshold =
+          inventoryData['lowStockThreshold'] as int? ?? 10;
       final itemName = inventoryData['itemName'] as String? ?? 'Unknown Item';
       final unit = inventoryData['unit'] as String? ?? 'units';
 
       if (quantity <= lowStockThreshold) {
-        await FirebaseFirestore.instance.collection('notifications').add({
-          'title': 'Low Inventory',
-          'body': '$itemName low: only $quantity $unit left',
-          'isRead': false,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
+        await addNotification(
+          'inventory',
+          'Low Inventory',
+          '$itemName low: only $quantity $unit left',
+        );
       }
     } catch (e) {
       // Don't fail inventory update if notification fails

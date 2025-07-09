@@ -47,6 +47,7 @@ import '../screens/legal/terms_screen.dart';
 
 // Notifications
 import '../screens/notifications/notifications_screen.dart';
+import '../screens/notifications/add_notifications_screen.dart';
 import '../screens/settings_menu/settings_menu_screen.dart';
 
 // Master Data

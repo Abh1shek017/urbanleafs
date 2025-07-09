@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/expense_model.dart';
+import '../utils/notifications_util.dart';
 import 'base_repository.dart';
 
 class ExpenseRepository extends BaseRepository {
@@ -42,12 +43,11 @@ class ExpenseRepository extends BaseRepository {
       final amount = expenseData['amount'] ?? 0.0;
       final type = expenseData['type'] ?? 'other';
 
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'title': 'New Expense',
-        'body': '$description - ₹${amount.toStringAsFixed(2)} ($type)',
-        'isRead': false,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      await addNotification(
+        'expenses',
+        'New Expense',
+        '$description - ₹${amount.toStringAsFixed(2)} ($type)',
+      );
     } catch (e) {
       // Don't fail expense creation if notification fails
       // print('Failed to create expense notification: $e');

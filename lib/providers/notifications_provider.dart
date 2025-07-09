@@ -1,18 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/notifiction_model.dart';
+import '../models/notification_model.dart';
 import '../repositories/notification_repository.dart';
 
-final notificationsStreamProvider = StreamProvider<List<NotificationModel>>((
-  ref,
-) {
-  return ref.watch(notificationsRepositoryProvider).getAllNotificationsStream();
+// ✅ Stream provider that listens to all notifications from all types
+final notificationsStreamProvider = StreamProvider<List<NotificationModel>>((ref) {
+  final repository = ref.watch(notificationsRepositoryProvider);
+  return repository.getAllNotificationsStream();
 });
 
-final createNotificationProvider =
-    FutureProvider.family<void, Map<String, String>>((ref, params) async {
-      final repository = ref.read(notificationsRepositoryProvider);
-      await repository.createNotification(
-        title: params['title'] ?? '',
-        body: params['body'] ?? '',
-      );
-    });
+// ✅ Future provider for creating notifications with explicit type
+final createNotificationProvider = FutureProvider.family<void, Map<String, String>>((ref, params) async {
+  final repository = ref.read(notificationsRepositoryProvider);
+
+  final type = params['type'];
+  if (type == null) {
+    throw Exception("Notification type is required.");
+  }
+
+  await repository.createNotification(
+    title: params['title'] ?? '',
+    body: params['body'] ?? '',
+    type: type,
+  );
+});

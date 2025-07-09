@@ -328,14 +328,16 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                         if (isEdit) {
                           await repo.updateInventory(item.id, data);
                           await addNotification(
-                            title: 'Inventory Updated',
-                            body: '$itemName updated to $quantity $unit',
+                            'inventory',
+                            'Inventory Updated',
+                            '$itemName updated to $quantity $unit',
                           );
                         } else {
                           await repo.addInventory(data);
                           await addNotification(
-                            title: 'New Inventory Item',
-                            body: '$itemName added with $quantity $unit',
+                            'inventory',
+                            'New Inventory Item',
+                            '$itemName added with $quantity $unit',
                           );
                         }
                         if (!context.mounted) return;

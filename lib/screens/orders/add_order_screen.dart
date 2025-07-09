@@ -192,9 +192,9 @@ Future<void> _loadMasterData() async {
                               await ref.read(addOrderFutureProvider(orderData).future);
 
                               await addNotification(
-                                title: 'New Order',
-                                body:
-                                    'Order for $_selectedItem ($_quantity pcs) by $_selectedCustomer',
+                                'orders',
+                                'New Order',
+                                'Order for $_selectedItem ($_quantity pcs) by $_selectedCustomer',
                               );
 
                               if (context.mounted) {

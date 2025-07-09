@@ -1,14 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-Future<void> addNotification({
-  required String title,
-  required String body,
-  bool isRead = false,
-}) async {
-  await FirebaseFirestore.instance.collection('notifications').add({
+Future<void> addNotification(String type, String title, String message) async {
+  final firestore = FirebaseFirestore.instance;
+
+  await firestore
+      .collection('notifications')
+      .doc(type)
+      .collection('items')
+      .add({
     'title': title,
-    'body': body,
-    'isRead': isRead,
+    'message': message,
+    'type': type,
+    'isRead': false,
     'timestamp': FieldValue.serverTimestamp(),
   });
 }
