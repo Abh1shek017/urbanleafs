@@ -80,7 +80,8 @@ class AddInventoryScreen extends ConsumerWidget {
               TextFormField(
                 initialValue: '10',
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Low Stock Threshold"),
+                decoration:
+                    const InputDecoration(labelText: "Low Stock Threshold"),
                 validator: (value) {
                   if (value == null || value.isEmpty) return "Required";
                   if (int.tryParse(value) == null) return "Enter valid number";
@@ -92,7 +93,7 @@ class AddInventoryScreen extends ConsumerWidget {
               ElevatedButton.icon(
                 icon: const Icon(Icons.add),
                 label: const Text("Add Item"),
-                onPressed: () {
+                onPressed: () async {
                   if (formKey.currentState!.validate()) {
                     formKey.currentState!.save();
 
@@ -106,8 +107,19 @@ class AddInventoryScreen extends ConsumerWidget {
                       'updatedBy': user?.uid ?? 'unknown',
                     };
 
-                    ref.read(addInventoryItemFutureProvider(itemData).future);
-                    Navigator.of(context).pop(true); // Return success
+                    try {
+                      final repository = ref.read(inventoryRepositoryProvider);
+                      await repository.addInventory(itemData);
+                      if (context.mounted) {
+                        Navigator.of(context).pop(true);
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Failed to add item: $e")),
+                        );
+                      }
+                    }
                   }
                 },
               )

@@ -7,9 +7,8 @@ class InventoryModel {
   final String unit;
   final DateTime lastUpdated;
   final String updatedBy;
-
   final String type; // 'raw' or 'prepared'
-  final int lowStockThreshold; // optional, default to 10 if missing
+  final int lowStockThreshold;
 
   InventoryModel({
     required this.id,
@@ -23,17 +22,17 @@ class InventoryModel {
   });
 
   factory InventoryModel.fromSnapshot(DocumentSnapshot snapshot) {
-    final data = snapshot.data() as Map<String, dynamic>;
+    final data = snapshot.data() as Map<String, dynamic>? ?? {};
 
     return InventoryModel(
       id: snapshot.id,
       itemName: data['itemName'] ?? '',
-      quantity: data['quantity'] ?? 0,
+      quantity: _parseInt(data['quantity']),
       unit: data['unit'] ?? '',
-      lastUpdated: (data['lastUpdated'] as Timestamp).toDate(),
+      lastUpdated: _parseTimestamp(data['lastUpdated']),
       updatedBy: data['updatedBy'] ?? '',
       type: data['type'] ?? 'raw',
-      lowStockThreshold: data['lowStockThreshold'] ?? 10,
+      lowStockThreshold: _parseInt(data['lowStockThreshold'], defaultValue: 10),
     );
   }
 
@@ -47,5 +46,17 @@ class InventoryModel {
       'type': type,
       'lowStockThreshold': lowStockThreshold,
     };
+  }
+
+  static int _parseInt(dynamic value, {int defaultValue = 0}) {
+    if (value == null) return defaultValue;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    return defaultValue;
+  }
+
+  static DateTime _parseTimestamp(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    return DateTime.now();
   }
 }

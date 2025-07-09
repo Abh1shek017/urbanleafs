@@ -88,7 +88,7 @@ class _CustomBottomNavState extends State<CustomBottomNav>
                 iconItem(Icons.account_balance_outlined, "Balance", 1, 1),
                 SizedBox(width: widget.fabSize),
                 iconItem(Icons.bar_chart, "Inventory", 2, 3),
-                profileItem(3, 4), // custom profile with image or fallback
+                profileItem(3, 4), // improved
               ],
             ),
           ),
@@ -172,6 +172,9 @@ class _CustomBottomNavState extends State<CustomBottomNav>
   }
 
   Widget profileItem(int controllerIndex, int pageIndex) {
+    final imageUrl = widget.profileImageUrl;
+    final isValidUrl = imageUrl != null && imageUrl.trim().isNotEmpty;
+
     return ScaleTransition(
       scale: _iconControllers[controllerIndex],
       child: Material(
@@ -185,10 +188,17 @@ class _CustomBottomNavState extends State<CustomBottomNav>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                widget.profileImageUrl != null
+                isValidUrl
                     ? CircleAvatar(
-                        backgroundImage: NetworkImage(widget.profileImageUrl!),
                         radius: 15,
+                        backgroundColor: Colors.grey[300],
+                        backgroundImage: NetworkImage(imageUrl),
+                        onBackgroundImageError: (_, __) {
+                          // fallback icon on load error
+                          setState(() {
+                            // widget.profileImageUrl = null;
+                          });
+                        },
                       )
                     : Icon(
                         Icons.person_outline,
