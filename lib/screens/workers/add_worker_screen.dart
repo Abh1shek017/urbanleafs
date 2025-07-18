@@ -72,10 +72,10 @@ class _AddWorkerScreenState extends ConsumerState<AddWorkerScreen> {
     }
 
     try {
-      final docRef = FirebaseFirestore.instance
-          .collection(AppConstants.collectionWorkers)
-          .doc();
-      final workerId = docRef.id;
+      final workerId = name.trim().replaceAll(' ', '_').toLowerCase();
+      final docRef =
+          FirebaseFirestore.instance.collection(AppConstants.collectionWorkers)
+          .doc(workerId);
 
       String imageUrl = '';
       if (_selectedImage != null) {

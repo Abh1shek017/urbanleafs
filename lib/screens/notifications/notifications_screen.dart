@@ -9,7 +9,7 @@ import '../../models/notification_model.dart';
 // StreamProvider to listen to all notifications across subcollections
 final allNotificationsProvider = StreamProvider<List<NotificationModel>>((ref) {
   final firestore = FirebaseFirestore.instance;
-  final types = ['orders', 'expenses', 'payments', 'inventory'];
+  final types = ['orders', 'expenses', 'payments', 'inventory', 'attendance'];
 
   final streams = types.map((type) {
     return firestore

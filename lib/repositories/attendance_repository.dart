@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart'; // For DateUtils
 import 'package:urbanleafs/constants/app_constants.dart';
@@ -46,7 +45,7 @@ class AttendanceRepository extends BaseRepository {
     final start = DateTime(year, month, 1);
     final end = DateTime(year, month + 1, 0, 23, 59, 59);
 
-    // First, get all active workers
+    // Get all active workers
     final workersSnapshot = await FirebaseFirestore.instance
         .collection('workers')
         .where('isActive', isEqualTo: true)
@@ -56,7 +55,7 @@ class AttendanceRepository extends BaseRepository {
         .map((doc) => WorkerModel.fromDoc(doc))
         .toList();
 
-    // Then, get attendance records for the month
+    // Get attendance records for month
     final attendanceSnapshot = await FirebaseFirestore.instance
         .collection('attendance')
         .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
@@ -67,22 +66,15 @@ class AttendanceRepository extends BaseRepository {
         .map((doc) => AttendanceModel.fromSnapshot(doc))
         .toList();
 
-    // Create a map of worker data for quick lookup
-    final Map<String, WorkerModel> workerMap = {};
-    for (var worker in workers) {
-      workerMap[worker.id] = worker;
-    }
-
     // Group attendance by userId
     final Map<String, List<AttendanceModel>> attendanceByUser = {};
     for (var record in attendanceRecords) {
       attendanceByUser.putIfAbsent(record.userId, () => []).add(record);
     }
 
-    // Build WorkerSummaryModel list
+    // Build summaries
     return workers.map((worker) {
       final history = attendanceByUser[worker.id] ?? [];
-
       final present = history.where((att) => att.status == 'present').length;
       final absent = history.where((att) => att.status == 'absent').length;
       final half = history.where((att) => att.status == 'halfDay').length;
@@ -97,7 +89,7 @@ class AttendanceRepository extends BaseRepository {
     }).toList();
   }
 
-  /// 🔁 Stream: Count of today's attendance for a specific shift and Present only
+  /// 🔁 Stream: Count of today's attendance for a specific shift (present only)
   Stream<int> countTodaysAttendance(DateTime date, {required String shift}) {
     final today = DateUtils.dateOnly(date);
     return collection
@@ -108,7 +100,7 @@ class AttendanceRepository extends BaseRepository {
         .map((snapshot) => snapshot.docs.length);
   }
 
-  /// ✅ Mark attendance idempotently (no duplicate for same user/date/shift)
+  /// ✅ Mark attendance using composite doc id {yyyy-MM-dd_userId_shift}
   Future<void> markAttendance({
     required String userId,
     required String shift,
@@ -116,33 +108,25 @@ class AttendanceRepository extends BaseRepository {
     required String markedBy,
   }) async {
     final today = DateUtils.dateOnly(DateTime.now());
-    final query = await collection
-        .where('userId', isEqualTo: userId)
-        .where('date', isEqualTo: Timestamp.fromDate(today))
-        .where('shift', isEqualTo: shift)
-        .limit(1)
-        .get();
+    final dateStr = "${today.year.toString().padLeft(4, '0')}-"
+                    "${today.month.toString().padLeft(2, '0')}-"
+                    "${today.day.toString().padLeft(2, '0')}";
 
-    if (query.docs.isEmpty) {
-      await collection.add({
-        'userId': userId,
-        'date': Timestamp.fromDate(today),
-        'shift': shift,
-        'status': status,
-        'markedAt': Timestamp.now(),
-        'markedBy': markedBy,
-      });
-    } else {
-      await query.docs.first.reference.update({
-        'status': status,
-        'markedAt': Timestamp.now(),
-        'markedBy': markedBy,
-      });
-    }
+    final docId = "${dateStr}_${userId}_$shift";
 
-    // ✅ Create notification for attendance update
+    final docRef = collection.doc(docId);
+
+    await docRef.set({
+      'userId': userId,
+      'date': Timestamp.fromDate(today),
+      'shift': shift,
+      'status': status,
+      'markedAt': Timestamp.now(),
+      'markedBy': markedBy,
+    }, SetOptions(merge: true));
+
+    // ✅ Create notification
     try {
-      // Get worker name for notification
       final workerDoc = await FirebaseFirestore.instance
           .collection('workers')
           .doc(userId)
@@ -158,8 +142,7 @@ class AttendanceRepository extends BaseRepository {
         '$workerName marked $status in $shift shift',
       );
     } catch (e) {
-      // Don't fail attendance marking if notification fails
-      // print('Failed to create attendance notification: $e');
+      // Don’t fail attendance if notification fails
     }
   }
 
@@ -191,6 +174,7 @@ class AttendanceRepository extends BaseRepository {
         .toList();
   }
 
+  /// 📊 Get count stats for today by status
   Future<Map<String, int>> getTodayAttendanceStats({
     required DateTime date,
     required String shift,
