@@ -11,7 +11,7 @@ class DashboardState {
   // Orders & Payments
   final int totalOrders;
   final double todayEarnings;
-  final int todayCustomerCount; // ✅ NEW
+  final int todayCustomerCount;
   final double todayExpenses;
 
   // Inventory
@@ -26,10 +26,12 @@ class DashboardState {
     this.afternoonAbsent = 0,
     this.totalOrders = 0,
     this.todayEarnings = 0.0,
-    this.todayCustomerCount = 0, // ✅ NEW DEFAULT
+    this.todayCustomerCount = 0,
     this.todayExpenses = 0.0,
     this.totalInventory = 0.0,
   });
+
+  factory DashboardState.initial() => DashboardState();
 
   DashboardState copyWith({
     bool? isLoading,
@@ -40,7 +42,7 @@ class DashboardState {
     int? afternoonAbsent,
     int? totalOrders,
     double? todayEarnings,
-    int? todayCustomerCount, // ✅ NEW
+    int? todayCustomerCount,
     double? todayExpenses,
     double? totalInventory,
   }) {
@@ -53,7 +55,7 @@ class DashboardState {
       afternoonAbsent: afternoonAbsent ?? this.afternoonAbsent,
       totalOrders: totalOrders ?? this.totalOrders,
       todayEarnings: todayEarnings ?? this.todayEarnings,
-      todayCustomerCount: todayCustomerCount ?? this.todayCustomerCount, // ✅ NEW
+      todayCustomerCount: todayCustomerCount ?? this.todayCustomerCount,
       todayExpenses: todayExpenses ?? this.todayExpenses,
       totalInventory: totalInventory ?? this.totalInventory,
     );

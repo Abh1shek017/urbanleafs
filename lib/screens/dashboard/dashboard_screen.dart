@@ -7,6 +7,9 @@ import '../../utils/format_utils.dart';
 import '../../viewmodels/dashboard_viewmodel.dart';
 import '../../viewmodels/order_viewmodel.dart';
 import '../../providers/inventory_provider.dart';
+// import '../../providers/attendance_provider.dart';          
+import '../../providers/payment_provider.dart';
+import '../../providers/expense_provider.dart';
 import '../attendance/attendance_screen.dart';
 import '../attendance/daily_attendance_screen.dart';
 import '../balance_sheet/balance_sheet_screen.dart';
@@ -25,13 +28,13 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  int _selectedIndex = 2; // Start directly on Home
+  int _selectedIndex = 2; // Home tab
 
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(dashboardViewModelProvider.notifier).loadDashboardData();
+      ref.read(dashboardViewModelProvider.notifier).refreshAll();
     });
   }
 
@@ -40,6 +43,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final dashboardState = ref.watch(dashboardViewModelProvider);
     final dashboardNotifier = ref.read(dashboardViewModelProvider.notifier);
     final userAsync = ref.watch(currentUserStreamProvider);
+
     String? profileImageUrl;
     userAsync.whenData((user) {
       profileImageUrl = user?.profileImageUrl;
@@ -74,6 +78,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     dashboardNotifier,
   ) {
     final inventoryAsync = ref.watch(inventoryStreamProvider);
+    final todaysOrderCount = ref.watch(todaysOrderCountStreamProvider);
+    final todaysEarnings = ref.watch(todaysPaymentsStreamProvider);
+    final todaysExpenses = ref.watch(todaysExpensesStreamProvider);
+
 
     return Scaffold(
       appBar: const CustomAppBar(title: "UrbanLeafs"),
@@ -127,13 +135,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       builder: (_) => const TodayOrdersScreen(),
                     ),
                   ),
-                  subtitle: ref
-                      .watch(todaysOrderCountStreamProvider)
-                      .when(
-                        data: (count) => "$count orders",
-                        loading: () => "Loading...",
-                        error: (_, __) => "Error",
-                      ),
+                  subtitle: todaysOrderCount.when(
+                    data: (count) => "$count orders",
+                    loading: () => "Loading...",
+                    error: (_, __) => "Error",
+                  ),
                 ),
                 _buildQuickAccessCard(
                   context,
@@ -145,8 +151,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       builder: (_) => const TodayPaymentsScreen(),
                     ),
                   ),
-                  subtitle:
-                      "${FormatUtils.formatCurrency(dashboardState.todayEarnings)}\nFrom ${dashboardState.todayCustomerCount} customers",
+                  subtitle: todaysEarnings.when(
+                    data: (earningData) {
+                      final total = earningData.fold<double>(
+                        0,
+                        (sum, p) => sum + (p.amount),
+                      );
+                      final customerCount = earningData
+                          .map((p) => p.customerName)
+                          .toSet()
+                          .length;
+                      return "${FormatUtils.formatCurrency(total)}\nFrom $customerCount customers";
+                    },
+                    loading: () => "Loading...",
+                    error: (_, __) => "Error",
+                  ),
                 ),
                 inventoryAsync.when(
                   loading: () => const SizedBox(),
@@ -188,8 +207,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       builder: (_) => const TodayExpenseScreen(),
                     ),
                   ),
-                  subtitle: FormatUtils.formatCurrency(
-                    dashboardState.todayExpenses,
+                  subtitle: todaysExpenses.when(
+                    data: (expenseList) {
+                      final total = expenseList.fold<double>(
+                        0,
+                        (sum, e) => sum + e.amount,
+                      );
+                      return FormatUtils.formatCurrency(total);
+                    },
+                    loading: () => "Loading...",
+                    error: (_, __) => "Error",
                   ),
                 ),
               ],
