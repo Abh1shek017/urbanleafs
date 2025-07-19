@@ -4,24 +4,24 @@ import 'package:table_calendar/table_calendar.dart' as table_calendar;
 import '../../models/workers_summary_model.dart';
 import '../../providers/attendance_summary_provider.dart';
 
-class AttendanceScreen extends ConsumerWidget {
+class AttendanceScreen extends ConsumerStatefulWidget {
   const AttendanceScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+    ConsumerState<AttendanceScreen> createState() => _AttendanceScreenState();
+}
+
+class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
+  int selectedMonth = DateTime.now().month;
+  int selectedYear = DateTime.now().year;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(attendanceSummaryStateProvider);
     final workerList = state.workers;
     final totalWorkers = workerList.length;
     final totalPresent = workerList.fold<int>(0, (sum, w) => sum + w.presentDays);
     final totalAbsent = workerList.fold<int>(0, (sum, w) => sum + w.absentDays);
-
-    if (state.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    if (state.error != null) {
-      return Scaffold(body: Center(child: Text('Error: ${state.error}')));
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -30,21 +30,35 @@ class AttendanceScreen extends ConsumerWidget {
           style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
         ),
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _FilterBarDelegate(
-              child: _FilterBar(
-                onFilterChanged: (month, year) {
-                  ref.read(attendanceSummaryStateProvider.notifier).setFilter(month, year);
-                },
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      body: state.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : state.error != null
+              ? Center(child: Text('Error: ${state.error}'))
+              : Column(
+    children: [
+      // ✅ FilterBar remains fixed
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: _FilterBar(
+          selectedMonth: selectedMonth,
+          selectedYear: selectedYear,
+          onFilterChanged: (month, year) {
+            setState(() {
+              selectedMonth = month;
+              selectedYear = year;
+            });
+            ref.read(attendanceSummaryStateProvider.notifier).setFilter(month, year);
+          },
+        ),
+      ),
+
+      // ✅ This scrolls: SummaryCard + Worker List
+      Expanded(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 16),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: SummaryCard(
                 totalWorkers: totalWorkers,
                 morningPresent: totalPresent,
@@ -53,28 +67,30 @@ class AttendanceScreen extends ConsumerWidget {
                 afternoonAbsent: totalAbsent,
               ),
             ),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final worker = workerList[index];
-                return WorkerCard(
-                  worker: worker,
-                  onTap: () => _showWorkerDetailSheet(context, worker),
-                );
-              },
-              childCount: workerList.length,
-            ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            ...workerList.map((worker) {
+              return WorkerCard(
+                worker: worker,
+                onTap: () => _showWorkerDetailSheet(context, worker),
+              );
+            }).toList(),
+          ],
+        ),
       ),
+    ],
+  ),
+
     );
   }
 
   void _showWorkerDetailSheet(BuildContext context, WorkerSummaryModel worker) {
     final events = <DateTime, List<String>>{};
     for (final record in worker.attendanceHistory) {
-      final day = DateTime(record.date.year, record.date.month, record.date.day);
+      final day = DateTime(
+        record.date.year,
+        record.date.month,
+        record.date.day,
+      );
       events.putIfAbsent(day, () => []).add(record.status);
     }
 
@@ -92,21 +108,30 @@ class AttendanceScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
-                    child: CircleAvatar(
-                      radius: 40,
-                      backgroundImage: (worker.worker.imageUrl.isNotEmpty)
-                          ? NetworkImage(worker.worker.imageUrl)
-                          : null,
-                      child: (worker.worker.imageUrl.isEmpty)
-                          ? const Icon(Icons.person, size: 40)
-                          : null,
-                    ),
+                    child:worker.worker.imageUrl.isNotEmpty
+  ? CircleAvatar(
+      radius: 40,
+      backgroundColor: Colors.grey.shade200,
+      backgroundImage: NetworkImage(worker.worker.imageUrl),
+      onBackgroundImageError: (_, __) {},
+    )
+  : CircleAvatar(
+      radius: 40,
+      backgroundColor: Colors.grey.shade200,
+      child: const Icon(Icons.person_outline, size: 40, color: Colors.grey),
+    ),
+
+
+
                   ),
                   const SizedBox(height: 8),
                   Center(
                     child: Text(
                       worker.worker.name,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -117,7 +142,10 @@ class AttendanceScreen extends ConsumerWidget {
                         child: Center(
                           child: Text(
                             "📞 ${worker.worker.phone}",
-                            style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[700],
+                            ),
                           ),
                         ),
                       ),
@@ -126,7 +154,10 @@ class AttendanceScreen extends ConsumerWidget {
                           child: Text(
                             "🏠 ${worker.worker.address}",
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                            ),
                           ),
                         ),
                       ),
@@ -147,16 +178,23 @@ class AttendanceScreen extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       final record = worker.attendanceHistory[index];
                       return ListTile(
-                        title: Text("${record.date.toLocal().toIso8601String().split('T')[0]} - ${record.shift}"),
+                        title: Text(
+                          "${record.date.toLocal().toIso8601String().split('T')[0]} - ${record.shift}",
+                        ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: _statusColor(record.status),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             record.status,
-                            style: TextStyle(color: _statusColor(record.status)),
+                            style: TextStyle(
+                              color: _statusColor(record.status),
+                            ),
                           ),
                         ),
                       );
@@ -171,7 +209,11 @@ class AttendanceScreen extends ConsumerWidget {
     );
   }
 
-  void _showDayAttendanceDialog(BuildContext context, DateTime day, List<String> statuses) {
+  void _showDayAttendanceDialog(
+    BuildContext context,
+    DateTime day,
+    List<String> statuses,
+  ) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -186,14 +228,21 @@ class AttendanceScreen extends ConsumerWidget {
                 children: statuses.map((status) {
                   return Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: _statusColor(status),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.circle, size: 12, color: _statusColor(status)),
+                        Icon(
+                          Icons.circle,
+                          size: 12,
+                          color: _statusColor(status),
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           status[0].toUpperCase() + status.substring(1),
@@ -214,7 +263,10 @@ class AttendanceScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCalendar(Map<DateTime, List<String>> events, BuildContext context) {
+  Widget _buildCalendar(
+    Map<DateTime, List<String>> events,
+    BuildContext context,
+  ) {
     return table_calendar.TableCalendar(
       firstDay: DateTime.utc(2020, 1, 1),
       lastDay: DateTime.utc(2030, 12, 31),
@@ -231,17 +283,30 @@ class AttendanceScreen extends ConsumerWidget {
                 color: _statusColor(status),
               ),
               child: Center(
-                child: Text('${day.day}', style: TextStyle(color: _statusColor(status))),
+                child: Text(
+                  '${day.day}',
+                  style: TextStyle(color: _statusColor(status)),
+                ),
               ),
             );
           }
           return null;
         },
       ),
-      calendarStyle: const table_calendar.CalendarStyle(outsideDaysVisible: false),
+      calendarStyle: const table_calendar.CalendarStyle(
+        outsideDaysVisible: false,
+      ),
       onDaySelected: (selectedDay, focusedDay) {
-        final key = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
-        _showDayAttendanceDialog(context, key, events[key] ?? []);
+        final key = DateTime(
+          selectedDay.year,
+          selectedDay.month,
+          selectedDay.day,
+        );
+        if (events.containsKey(key)) {
+          _showDayAttendanceDialog(context, key, events[key]!);
+        } else {
+          _showDayAttendanceDialog(context, key, []);
+        }
       },
     );
   }
@@ -260,221 +325,9 @@ class AttendanceScreen extends ConsumerWidget {
   }
 }
 
-class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-
-  _FilterBarDelegate({required this.child});
-
-  @override
-  double get minExtent => 70;
-
-  @override
-  double get maxExtent => 70;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Material(
-      color: Colors.white,
-      elevation: overlapsContent ? 2 : 0,
-      child: child,
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) => true;
-}
-
-class _FilterBar extends StatefulWidget {
-  final void Function(int month, int year) onFilterChanged;
-
-  const _FilterBar({required this.onFilterChanged});
-
-  @override
-  State<_FilterBar> createState() => _FilterBarState();
-}
-
-class _FilterBarState extends State<_FilterBar> {
-  int selectedMonth = DateTime.now().month;
-  int selectedYear = DateTime.now().year;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 70,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      alignment: Alignment.center,
-      color: Colors.white,
-      child: Row(
-        children: [
-          Expanded(
-            child: DropdownButton<int>(
-              value: selectedMonth,
-              isExpanded: true,
-              items: List.generate(12, (index) {
-                final month = index + 1;
-                return DropdownMenuItem(
-                  value: month,
-                  child: Text(
-                    [
-                      '',
-                      'January',
-                      'February',
-                      'March',
-                      'April',
-                      'May',
-                      'June',
-                      'July',
-                      'August',
-                      'September',
-                      'October',
-                      'November',
-                      'December',
-                    ][month],
-                  ),
-                );
-              }),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => selectedMonth = value);
-                  widget.onFilterChanged(selectedMonth, selectedYear);
-                }
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: DropdownButton<int>(
-              value: selectedYear,
-              isExpanded: true,
-              items: List.generate(5, (index) {
-                final year = DateTime.now().year - index;
-                return DropdownMenuItem(value: year, child: Text("$year"));
-              }),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => selectedYear = value);
-                  widget.onFilterChanged(selectedMonth, selectedYear);
-                }
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class SummaryCard extends StatelessWidget {
-  final int totalWorkers;
-  final int morningPresent;
-  final int morningAbsent;
-  final int afternoonPresent;
-  final int afternoonAbsent;
-
-  const SummaryCard({
-    super.key,
-    required this.totalWorkers,
-    required this.morningPresent,
-    required this.morningAbsent,
-    required this.afternoonPresent,
-    required this.afternoonAbsent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 130,
-            height: 150,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0F2F1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "TOTAL",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Center(
-                  child: Text(
-                    "$totalWorkers",
-                    style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF9C4),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Morning", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                      const SizedBox(height: 6),
-                      Text("$morningPresent P / $morningAbsent A", style: const TextStyle(fontSize: 14)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFBBDEFB),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Afternoon", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                      const SizedBox(height: 6),
-                      Text("$afternoonPresent P / $afternoonAbsent A", style: const TextStyle(fontSize: 14)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class WorkerCard extends StatelessWidget {
   final WorkerSummaryModel worker;
   final VoidCallback onTap;
-
   const WorkerCard({super.key, required this.worker, required this.onTap});
 
   Color getBorderColor() {
@@ -505,32 +358,54 @@ class WorkerCard extends StatelessWidget {
         onTap: onTap,
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundImage: (worker.worker.imageUrl.isNotEmpty)
-                  ? NetworkImage(worker.worker.imageUrl)
-                  : null,
-              child: (worker.worker.imageUrl.isEmpty)
-                  ? const Icon(Icons.person, size: 30)
-                  : null,
-            ),
+           worker.worker.imageUrl.isNotEmpty
+  ? CircleAvatar(
+      radius: 40,
+      backgroundColor: Colors.grey.shade200,
+      backgroundImage: NetworkImage(worker.worker.imageUrl),
+      onBackgroundImageError: (_, __) {},
+    )
+  : CircleAvatar(
+      radius: 40,
+      backgroundColor: Colors.grey.shade200,
+      child: const Icon(Icons.person_outline, size: 40, color: Colors.grey),
+    ),
+
+
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    worker.worker.name.isNotEmpty ? worker.worker.name : "No Name",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    worker.worker.name.isNotEmpty
+                        ? worker.worker.name
+                        : "No Name",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      _statusIconText(Icons.check_circle, Colors.green, "P: ${worker.presentDays}"),
+                      _statusIconText(
+                        Icons.check_circle,
+                        Colors.green,
+                        "P: ${worker.presentDays}",
+                      ),
                       const SizedBox(width: 8),
-                      _statusIconText(Icons.cancel, Colors.red, "A: ${worker.absentDays}"),
+                      _statusIconText(
+                        Icons.cancel,
+                        Colors.red,
+                        "A: ${worker.absentDays}",
+                      ),
                       const SizedBox(width: 8),
-                      _statusIconText(Icons.timelapse, Colors.orange, "H: ${worker.halfDays}"),
+                      _statusIconText(
+                        Icons.timelapse,
+                        Colors.orange,
+                        "H: ${worker.halfDays}",
+                      ),
                     ],
                   ),
                 ],
@@ -551,4 +426,214 @@ class WorkerCard extends StatelessWidget {
       ],
     );
   }
+}
+class _FilterBar extends StatelessWidget {
+  final int selectedMonth;
+  final int selectedYear;
+  final void Function(int month, int year) onFilterChanged;
+
+  const _FilterBar({
+    required this.selectedMonth,
+    required this.selectedYear,
+    required this.onFilterChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    final currentYear = DateTime.now().year;
+
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButton<int>(
+            value: selectedMonth,
+            isExpanded: true,
+            items: List.generate(12, (index) {
+              final month = index + 1;
+              return DropdownMenuItem(
+                value: month,
+                child: Text(monthNames[index]),
+              );
+            }),
+            onChanged: (value) {
+              if (value != null && value != selectedMonth) {
+                onFilterChanged(value, selectedYear);
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: DropdownButton<int>(
+            value: selectedYear,
+            isExpanded: true,
+            items: List.generate(10, (index) {
+              final year = currentYear - index;
+              return DropdownMenuItem(
+                value: year,
+                child: Text('$year'),
+              );
+            }),
+            onChanged: (value) {
+              if (value != null && value != selectedYear) {
+                onFilterChanged(selectedMonth, value);
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SummaryCard extends StatelessWidget {
+  final int totalWorkers;
+  final int morningPresent;
+  final int morningAbsent;
+  final int afternoonPresent;
+  final int afternoonAbsent;
+
+  const SummaryCard({
+    super.key,
+    required this.totalWorkers,
+    required this.morningPresent,
+    required this.morningAbsent,
+    required this.afternoonPresent,
+    required this.afternoonAbsent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    // TOTAL BOX
+    Container(
+      width: 130,
+      height: 150,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2F1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "TOTAL",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+          Center(
+            child: Text(
+              "$totalWorkers",
+              style: const TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          const Spacer(),
+        ],
+      ),
+    ),
+    const SizedBox(width: 12),
+
+    // WRAP the shift cards in Expanded to stretch to remaining space
+    Expanded(
+      child: Column(
+        children: [
+          // Morning
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF9C4),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Morning",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "$morningPresent P / $morningAbsent A",
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Afternoon
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFBBDEFB),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Afternoon",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "$afternoonPresent P / $afternoonAbsent A",
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  ],
+),
+);
+}
 }

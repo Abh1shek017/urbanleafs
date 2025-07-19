@@ -89,7 +89,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       default:
         base = Colors.grey.shade200;
     }
-    return isRead ? base.withOpacity(0.4) : base;
+    return isRead ? base.withValues(alpha: 0.4) : base;
   }
 
   // Group by Today / Yesterday / Date
