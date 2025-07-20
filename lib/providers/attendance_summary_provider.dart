@@ -3,6 +3,9 @@ import '../models/workers_summary_model.dart';
 import '../repositories/attendance_repository.dart'; // adjust path
 import '../providers/attendance_provider.dart';
 
+/// 🔁 Refresh trigger provider
+final attendanceRefreshTriggerProvider = StateProvider<int>((ref) => 0);
+
 class AttendanceSummaryState {
   final int month;
   final int year;
@@ -39,14 +42,14 @@ class AttendanceSummaryNotifier extends StateNotifier<AttendanceSummaryState> {
   final AttendanceRepository repo;
 
   AttendanceSummaryNotifier(this.repo)
-    : super(
-        AttendanceSummaryState(
-          month: DateTime.now().month,
-          year: DateTime.now().year,
-          workers: [],
-          isLoading: true,
-        ),
-      ) {
+      : super(
+          AttendanceSummaryState(
+            month: DateTime.now().month,
+            year: DateTime.now().year,
+            workers: [],
+            isLoading: true,
+          ),
+        ) {
     loadSummaries();
   }
 
@@ -71,8 +74,12 @@ class AttendanceSummaryNotifier extends StateNotifier<AttendanceSummaryState> {
 
 final attendanceSummaryStateProvider =
     StateNotifierProvider<AttendanceSummaryNotifier, AttendanceSummaryState>((
-      ref,
-    ) {
-      final repo = ref.read(attendanceRepositoryProvider);
-      return AttendanceSummaryNotifier(repo);
-    });
+  ref,
+) {
+  final repo = ref.read(attendanceRepositoryProvider);
+
+  // 👇 Watch the refresh trigger so this provider rebuilds when it changes
+  ref.watch(attendanceRefreshTriggerProvider);
+
+  return AttendanceSummaryNotifier(repo);
+});

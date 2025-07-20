@@ -37,57 +37,84 @@ class AttendanceRepository extends BaseRepository {
               .toList(),
         );
   }
+Future<List<WorkerSummaryModel>> getWorkerSummaries({
+  required int month,
+  required int year,
+}) async {
+  final start = DateTime(year, month, 1);
+  final end = DateTime(year, month + 1, 0, 23, 59, 59);
 
-  Future<List<WorkerSummaryModel>> getWorkerSummaries({
-    required int month,
-    required int year,
-  }) async {
-    final start = DateTime(year, month, 1);
-    final end = DateTime(year, month + 1, 0, 23, 59, 59);
+  // Get all active workers
+  final workersSnapshot = await FirebaseFirestore.instance
+      .collection('workers')
+      .where('isActive', isEqualTo: true)
+      .get();
 
-    // Get all active workers
-    final workersSnapshot = await FirebaseFirestore.instance
-        .collection('workers')
-        .where('isActive', isEqualTo: true)
-        .get();
+  final workers = workersSnapshot.docs
+      .map((doc) => WorkerModel.fromDoc(doc))
+      .toList();
 
-    final workers = workersSnapshot.docs
-        .map((doc) => WorkerModel.fromDoc(doc))
-        .toList();
+  // Get attendance records for the month
+  final attendanceSnapshot = await FirebaseFirestore.instance
+      .collection('attendance')
+      .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+      .where('date', isLessThanOrEqualTo: Timestamp.fromDate(end))
+      .get();
 
-    // Get attendance records for month
-    final attendanceSnapshot = await FirebaseFirestore.instance
-        .collection('attendance')
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(end))
-        .get();
+  final attendanceRecords = attendanceSnapshot.docs
+      .map((doc) => AttendanceModel.fromSnapshot(doc))
+      .toList();
 
-    final attendanceRecords = attendanceSnapshot.docs
-        .map((doc) => AttendanceModel.fromSnapshot(doc))
-        .toList();
+  // Group attendance by userId and then by date
+  final Map<String, Map<DateTime, Map<String, String>>> attendanceMap = {};
 
-    // Group attendance by userId
-    final Map<String, List<AttendanceModel>> attendanceByUser = {};
-    for (var record in attendanceRecords) {
-      attendanceByUser.putIfAbsent(record.userId, () => []).add(record);
+  for (var record in attendanceRecords) {
+    final userId = record.userId;
+    final dateOnly = DateTime(record.date.year, record.date.month, record.date.day);
+
+    attendanceMap.putIfAbsent(userId, () => {});
+    attendanceMap[userId]!.putIfAbsent(dateOnly, () => {});
+    attendanceMap[userId]![dateOnly]![record.shift] = record.status;
+  }
+
+  // Build summaries
+  return workers.map((worker) {
+    final userAttendance = attendanceMap[worker.id] ?? {};
+    int presentDays = 0;
+    int halfDays = 0;
+    int absentDays = 0;
+
+    for (final entry in userAttendance.entries) {
+      final shiftStatuses = entry.value;
+
+      final presentShifts = shiftStatuses.values
+          .where((status) => status.toLowerCase() == 'present')
+          .length;
+
+      if (presentShifts == 2) {
+        presentDays++;
+      } else if (presentShifts == 1) {
+        halfDays++;
+      } else {
+        absentDays++;
+      }
     }
 
-    // Build summaries
-    return workers.map((worker) {
-      final history = attendanceByUser[worker.id] ?? [];
-      final present = history.where((att) => att.status == 'present').length;
-      final absent = history.where((att) => att.status == 'absent').length;
-      final half = history.where((att) => att.status == 'halfDay').length;
+    // Flatten attendance history
+    final allAttendance = attendanceRecords
+        .where((att) => att.userId == worker.id)
+        .toList();
 
-      return WorkerSummaryModel(
-        worker: worker,
-        presentDays: present,
-        absentDays: absent,
-        halfDays: half,
-        attendanceHistory: history,
-      );
-    }).toList();
-  }
+    return WorkerSummaryModel(
+      worker: worker,
+      presentDays: presentDays,
+      halfDays: halfDays,
+      absentDays: absentDays,
+      attendanceHistory: allAttendance,
+    );
+  }).toList();
+}
+
 
   /// 🔁 Stream: Count of today's attendance for a specific shift (present only)
   Stream<int> countTodaysAttendance(DateTime date, {required String shift}) {
