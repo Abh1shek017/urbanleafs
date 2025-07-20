@@ -15,6 +15,20 @@ class AttendanceScreen extends ConsumerStatefulWidget {
 class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
   int selectedMonth = DateTime.now().month;
   int selectedYear = DateTime.now().year;
+@override
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final notifier = ref.read(attendanceSummaryStateProvider.notifier);
+    final now = DateTime.now();
+
+    // Reset the selected month/year to current
+    notifier.setFilter(now.month, now.year);
+
+    // Reload data for current month/year
+    notifier.loadSummaries();
+  });
+}
 
   @override
   Widget build(BuildContext context) {
@@ -62,35 +76,43 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                 ),
 
                 // ✅ This scrolls: SummaryCard + Worker List
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: SummaryCard(
-                          totalWorkers: totalWorkers,
-                          morningPresent: totalPresent,
-                          morningAbsent: totalAbsent,
-                          afternoonPresent: totalPresent,
-                          afternoonAbsent: totalAbsent,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...workerList.map((worker) {
-                        return WorkerCard(
-                          worker: worker,
-                          onTap: () => _showWorkerDetailSheet(
-                            context,
-                            worker,
-                            selectedMonth,
-                            selectedYear,
-                          ),
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ),
+               Expanded(
+  child: RefreshIndicator(
+    onRefresh: () async {
+      final notifier = ref.read(attendanceSummaryStateProvider.notifier);
+      await notifier.loadSummaries(); // ✅ Await data reload
+    },
+    child: ListView(
+      padding: const EdgeInsets.only(bottom: 16),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: SummaryCard(
+            totalWorkers: totalWorkers,
+            morningPresent: totalPresent,
+            morningAbsent: totalAbsent,
+            afternoonPresent: totalPresent,
+            afternoonAbsent: totalAbsent,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...workerList.map((worker) {
+          return WorkerCard(
+            worker: worker,
+            onTap: () => _showWorkerDetailSheet(
+              context,
+              worker,
+              selectedMonth,
+              selectedYear,
+            ),
+          );
+        }).toList(),
+      ],
+    ),
+  ),
+),
+
+
               ],
             ),
     );

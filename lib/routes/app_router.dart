@@ -1,5 +1,6 @@
-// import 'package:flutter/material.dart';
+// Add this to top (global routeObserver)
 import 'package:flutter/material.dart';
+// Rest of your imports
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,7 +8,6 @@ import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../utils/go_router_refresh_stream.dart';
-
 
 // Screens
 import '../screens/auth/login_screen.dart';
@@ -61,8 +61,7 @@ import '../screens/activity/downloads_screen.dart';
 import '../screens/activity/recent_activity_screen.dart';
 import '../screens/activity/usage_stats_screen.dart';
 
-// User Test
-// import '../../test/user_test.dart';
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authStateAsync = ref.watch(authStateProvider);
@@ -72,6 +71,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: GoRouterRefreshStream(
       ref.read(authServiceProvider).authState,
     ),
+    observers: [routeObserver], // ✅ Inject RouteObserver here
     redirect: (context, state) {
       final loggedIn = authStateAsync.asData?.value != null;
       final loggingIn = state.uri.path == '/login';
@@ -81,7 +81,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // Auth & Dashboard
       GoRoute(
         path: '/login',
         name: 'login',
@@ -92,8 +91,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'dashboard',
         builder: (context, state) => const DashboardScreen(),
       ),
-
-      // Core Modules
       GoRoute(
         path: '/attendance',
         name: 'attendance',
@@ -120,7 +117,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TodayPaymentsScreen(),
       ),
 
-      // Profile
       GoRoute(
         path: '/profile',
         name: 'profile',
@@ -137,7 +133,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ChangePasswordScreen(),
       ),
 
-      // Settings
       GoRoute(
         path: '/settings',
         name: 'settings',
@@ -169,7 +164,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AppearanceSettingsScreen(),
       ),
 
-      // Support
       GoRoute(
         path: '/support',
         name: 'support',
@@ -191,7 +185,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ContactSupportScreen(),
       ),
 
-      // Legal
       GoRoute(
         path: '/legal',
         name: 'legal',
@@ -213,7 +206,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TermsOfServiceScreen(),
       ),
 
-      // Admin only
       GoRoute(
         path: '/users',
         name: 'manage_users',
@@ -239,19 +231,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             child: const SettingsMenuScreen(),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
-                  return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(1, 0),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  );
-                },
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1, 0),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              );
+            },
           );
         },
       ),
 
-      // Master Data
       GoRoute(
         path: '/master-data/customers',
         name: 'manage_customers',
@@ -273,7 +264,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ManageExpensesScreen(),
       ),
 
-      // Activity
       GoRoute(
         path: '/orders/history',
         name: 'orders_history',
@@ -300,7 +290,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const UsageStatsScreen(),
       ),
 
-      // Additional Support Routes
       GoRoute(
         path: '/support/help',
         name: 'support_help',

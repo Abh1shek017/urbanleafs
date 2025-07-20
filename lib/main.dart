@@ -8,6 +8,9 @@ import 'package:urbanleafs/themes/app_theme.dart';
 import 'package:urbanleafs/themes/dark_theme.dart';
 import 'package:urbanleafs/providers/theme_provider.dart';
 
+/// ✅ Global RouteObserver
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -17,7 +20,6 @@ Future<void> main() async {
     persistenceEnabled: true,
   );
 
-  // Initialize local storage
   final localStorage = LocalStorageService();
   await localStorage.init();
 

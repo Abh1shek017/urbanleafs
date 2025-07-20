@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/workers_summary_model.dart';
-import '../repositories/attendance_repository.dart'; // adjust path
+import '../repositories/attendance_repository.dart';
 import '../providers/attendance_provider.dart';
 
-/// 🔁 Refresh trigger provider
+/// 🔁 Manual refresh trigger
 final attendanceRefreshTriggerProvider = StateProvider<int>((ref) => 0);
 
 class AttendanceSummaryState {
@@ -33,7 +33,7 @@ class AttendanceSummaryState {
       year: year ?? this.year,
       workers: workers ?? this.workers,
       isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
+      error: error,
     );
   }
 }
@@ -49,9 +49,8 @@ class AttendanceSummaryNotifier extends StateNotifier<AttendanceSummaryState> {
             workers: [],
             isLoading: true,
           ),
-        ) {
-    loadSummaries();
-  }
+          
+        );
 
   Future<void> loadSummaries() async {
     state = state.copyWith(isLoading: true);
@@ -60,7 +59,7 @@ class AttendanceSummaryNotifier extends StateNotifier<AttendanceSummaryState> {
         month: state.month,
         year: state.year,
       );
-      state = state.copyWith(workers: data, isLoading: false);
+      state = state.copyWith(workers: data, isLoading: false, error: null);
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
@@ -72,14 +71,15 @@ class AttendanceSummaryNotifier extends StateNotifier<AttendanceSummaryState> {
   }
 }
 
+/// ✅ Updated provider: also watches refresh trigger
 final attendanceSummaryStateProvider =
-    StateNotifierProvider<AttendanceSummaryNotifier, AttendanceSummaryState>((
-  ref,
-) {
+    StateNotifierProvider<AttendanceSummaryNotifier, AttendanceSummaryState>((ref) {
   final repo = ref.read(attendanceRepositoryProvider);
 
-  // 👇 Watch the refresh trigger so this provider rebuilds when it changes
+  // 👇 This will trigger the provider to rebuild when the refresh counter changes
   ref.watch(attendanceRefreshTriggerProvider);
 
-  return AttendanceSummaryNotifier(repo);
+  final notifier = AttendanceSummaryNotifier(repo);
+  notifier.loadSummaries(); // 👈 Force reloading when refreshed or rebuilt
+  return notifier;
 });
