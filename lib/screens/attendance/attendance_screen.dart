@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:table_calendar/table_calendar.dart' as table_calendar;
 import '../../models/workers_summary_model.dart';
 import '../../providers/attendance_summary_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 class AttendanceScreen extends ConsumerStatefulWidget {
   const AttendanceScreen({super.key});
@@ -71,7 +72,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
             ...workerList.map((worker) {
               return WorkerCard(
                 worker: worker,
-                onTap: () => _showWorkerDetailSheet(context, worker),
+                onTap: () => _showWorkerDetailSheet(context, worker, selectedMonth, selectedYear),
               );
             }).toList(),
           ],
@@ -79,135 +80,311 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
       ),
     ],
   ),
-
     );
   }
 
-  void _showWorkerDetailSheet(BuildContext context, WorkerSummaryModel worker) {
-    final events = <DateTime, List<String>>{};
-    for (final record in worker.attendanceHistory) {
-      final day = DateTime(
-        record.date.year,
-        record.date.month,
-        record.date.day,
-      );
-      events.putIfAbsent(day, () => []).add(record.status);
-    }
+  
+void _showWorkerDetailSheet(
+  BuildContext context,
+  WorkerSummaryModel worker,
+  int selectedMonth,
+  int selectedYear,
+) {
+  final now = DateTime.now();
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        builder: (context, scrollController) {
-          return SingleChildScrollView(
-            controller: scrollController,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child:worker.worker.imageUrl.isNotEmpty
-  ? CircleAvatar(
-      radius: 40,
-      backgroundColor: Colors.grey.shade200,
-      backgroundImage: NetworkImage(worker.worker.imageUrl),
-      onBackgroundImageError: (_, __) {},
-    )
-  : CircleAvatar(
-      radius: 40,
-      backgroundColor: Colors.grey.shade200,
-      child: const Icon(Icons.person_outline, size: 40, color: Colors.grey),
-    ),
+  final events = <DateTime, List<String>>{};
+  final Map<DateTime, List<String>> shiftMap = {};
+  for (final record in worker.attendanceHistory) {
+    final date = DateTime(record.date.year, record.date.month, record.date.day);
+    shiftMap.putIfAbsent(date, () => []).add(record.shift);
+    final isHalfDay = shiftMap[date]?.length == 1;
+    final status = isHalfDay && record.status.toLowerCase() == 'present' ? 'half-day' : record.status;
+    events.putIfAbsent(date, () => []).add(status);
+  }
 
+  DateTime displayedMonth = DateTime(selectedYear, selectedMonth);
 
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => DraggableScrollableSheet(
+      expand: false,
+      builder: (context, scrollController) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Avatar
+                    Center(
+                      child: worker.worker.imageUrl.isNotEmpty
+                          ? CircleAvatar(
+                              radius: 40,
+                              backgroundColor: const Color.fromARGB(255, 77, 196, 81),
+                              backgroundImage: NetworkImage(worker.worker.imageUrl),
+                              onBackgroundImageError: (_, __) {},
+                            )
+                          : CircleAvatar(
+                              radius: 40,
+                              backgroundColor: const Color.fromARGB(255, 77, 196, 81),
+                              child: const Icon(Icons.person, size: 40, color: Color.fromARGB(255, 239, 238, 238)),
+                            ),
+                    ),
+                    const SizedBox(height: 8),
 
-                  ),
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Text(
-                      worker.worker.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    // Name
+                    Center(
+                      child: Text(
+                        worker.worker.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(
-                        child: Center(
+
+                    const SizedBox(height: 8),
+
+                    // Phone + Address in same row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () async {
+                            final Uri phoneUri = Uri(scheme: 'tel', path: worker.worker.phone);
+                            if (await canLaunchUrl(phoneUri)) {
+                              await launchUrl(phoneUri);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not launch phone dialer')),
+                              );
+                            }
+                          },
                           child: Text(
                             "📞 ${worker.worker.phone}",
-                            style: TextStyle(
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
                               fontSize: 16,
-                              color: Colors.grey[700],
+                              color: Colors.blueAccent,
+                              decoration: TextDecoration.underline,
                             ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Center(
+                        Expanded(
                           child: Text(
                             "🏠 ${worker.worker.address}",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
                               fontSize: 16,
-                              color: Colors.grey[600],
+                              color: Colors.grey,
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildCalendar(events, context),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Attendance History",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: worker.attendanceHistory.length,
-                    itemBuilder: (context, index) {
-                      final record = worker.attendanceHistory[index];
-                      return ListTile(
-                        title: Text(
-                          "${record.date.toLocal().toIso8601String().split('T')[0]} - ${record.shift}",
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Month navigation arrows
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_left),
+                          onPressed: () {
+                            setState(() {
+                              displayedMonth = DateTime(displayedMonth.year, displayedMonth.month - 1);
+                            });
+                          },
                         ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _statusColor(record.status),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            record.status,
-                            style: TextStyle(
-                              color: _statusColor(record.status),
-                            ),
-                          ),
+                        Text(
+                          "${_monthName(displayedMonth.month)} ${displayedMonth.year}",
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                         ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
+                        IconButton(
+                          icon: const Icon(Icons.arrow_right),
+                          onPressed: () {
+                            final nextMonth = DateTime(displayedMonth.year, displayedMonth.month + 1);
+                            if (nextMonth.isBefore(DateTime(now.year, now.month + 1))) {
+                              setState(() {
+                                displayedMonth = nextMonth;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Calendar
+                    TableCalendar(
+  focusedDay: displayedMonth,
+  firstDay: DateTime(2020),
+  lastDay: DateTime(now.year, now.month, 31),
+  calendarFormat: CalendarFormat.month,
+  availableGestures: AvailableGestures.none,
+  headerVisible: false,
+  daysOfWeekVisible: true,
+  startingDayOfWeek: StartingDayOfWeek.sunday,
+  calendarStyle: const CalendarStyle(
+    isTodayHighlighted: true,
+    outsideDaysVisible: false,
+    defaultTextStyle: TextStyle(color: Colors.black),
+    weekendTextStyle: TextStyle(color: Colors.black),
+    markersMaxCount: 1,
+  ),
+  calendarBuilders: CalendarBuilders(
+    defaultBuilder: (context, day, _) {
+  final isInMonth = day.month == displayedMonth.month;
+  final statusList = events[DateTime(day.year, day.month, day.day)];
+  final isToday = day.year == now.year && day.month == now.month && day.day == now.day;
+
+  if (!isInMonth) return const SizedBox.shrink();
+
+  Color? outerColor;
+  if (statusList != null && statusList.isNotEmpty) {
+    final hasPresent = statusList.where((e) => e == 'present').length;
+    final hasAbsent = statusList.where((e) => e == 'absent').length;
+
+    if (hasPresent == 1 && hasAbsent == 0) {
+      outerColor = Colors.orange.shade400; // half-day
+    } else if (hasPresent >= 2) {
+      outerColor = Colors.green.shade400; // full present
+    } else if (hasAbsent >= 1 && hasPresent == 0) {
+      outerColor = Colors.red.shade400; // full absent
+    }
   }
+
+  return Center(
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        // Big attendance circle if marked
+        if (outerColor != null)
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: outerColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+
+        // Small gray dot inside (for today only)
+        if (isToday)
+          Container(
+            width: 10,
+            height: 10,
+            decoration: const BoxDecoration(
+              color: Colors.grey,
+              shape: BoxShape.circle,
+            ),
+          ),
+
+        // Date number on top
+        Text(
+          '${day.day}',
+          style: TextStyle(
+            color: (outerColor != null) ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    ),
+  );
+},
+
+  ),
+),
+
+
+                  const SizedBox(height: 16),
+
+const Text(
+  "Attendance History",
+  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+),
+
+const SizedBox(height: 8),
+
+// Sort outside the builder
+Builder(
+  builder: (context) {
+    final sortedList = worker.attendanceHistory.toList()
+      ..sort((a, b) => b.date.compareTo(a.date)); // ✅ Latest first
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: sortedList.length,
+      itemBuilder: (context, index) {
+        final record = sortedList[index];
+
+        return ListTile(
+          title: Text(
+            "${record.date.toLocal().toIso8601String().split('T')[0]} - ${record.shift}",
+          ),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _statusColor(record.status).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              record.status,
+              style: TextStyle(color: _statusColor(record.status)),
+            ),
+          ),
+        );
+      },
+    );
+  },
+),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ),
+  );
+}
+
+
+// --------------------------------------------
+// 📌 Helper functions (place at bottom of file)
+// --------------------------------------------
+
+Color _statusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'present':
+      return Colors.green;
+    case 'absent':
+      return Colors.red;
+    case 'half':
+    case 'half-day':
+      return Colors.deepOrange; // saffron color
+    default:
+      return Colors.grey;
+  }
+}
+
+String _monthName(int month) {
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return months[month - 1];
+}
+
 
   void _showDayAttendanceDialog(
     BuildContext context,
@@ -263,55 +440,71 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     );
   }
 
-  Widget _buildCalendar(
-    Map<DateTime, List<String>> events,
-    BuildContext context,
-  ) {
-    return table_calendar.TableCalendar(
-      firstDay: DateTime.utc(2020, 1, 1),
-      lastDay: DateTime.utc(2030, 12, 31),
-      focusedDay: DateTime.now(),
-      calendarBuilders: table_calendar.CalendarBuilders(
-        defaultBuilder: (context, day, focusedDay) {
-          final key = DateTime(day.year, day.month, day.day);
-          if (events.containsKey(key)) {
-            final status = events[key]!.first;
-            return Container(
-              margin: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _statusColor(status),
-              ),
-              child: Center(
-                child: Text(
-                  '${day.day}',
-                  style: TextStyle(color: _statusColor(status)),
-                ),
-              ),
-            );
-          }
-          return null;
-        },
-      ),
-      calendarStyle: const table_calendar.CalendarStyle(
-        outsideDaysVisible: false,
-      ),
-      onDaySelected: (selectedDay, focusedDay) {
-        final key = DateTime(
-          selectedDay.year,
-          selectedDay.month,
-          selectedDay.day,
-        );
-        if (events.containsKey(key)) {
-          _showDayAttendanceDialog(context, key, events[key]!);
-        } else {
-          _showDayAttendanceDialog(context, key, []);
-        }
-      },
-    );
+ Widget _buildCalendar(
+  Map<DateTime, List<String>> events,
+  BuildContext context,
+  DateTime displayedMonth,
+) {
+  final daysInMonth = DateUtils.getDaysInMonth(displayedMonth.year, displayedMonth.month);
+  final firstDay = DateTime(displayedMonth.year, displayedMonth.month, 1);
+  final weekdayOffset = firstDay.weekday % 7;
+
+  return GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: daysInMonth + weekdayOffset,
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 7,
+      crossAxisSpacing: 4,
+      mainAxisSpacing: 4,
+    ),
+    itemBuilder: (context, index) {
+      if (index < weekdayOffset) {
+        return const SizedBox(); // Empty for days before month starts
+      }
+
+      final day = index - weekdayOffset + 1;
+      final date = DateTime(displayedMonth.year, displayedMonth.month, day);
+      final statuses = events[date] ?? [];
+      final status = statuses.isNotEmpty ? statuses.first : '';
+
+      Color color;
+      switch (status.toLowerCase()) {
+        case 'present':
+          color = Colors.green;
+          break;
+        case 'absent':
+          color = Colors.red;
+          break;
+        case 'half':
+        case 'half-day':
+          color = Colors.deepOrange;
+          break;
+        default:
+          color = Colors.transparent;
+      }
+
+      return Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withValues(alpha: 0.2),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$day',
+          style: TextStyle(
+            color: color == Colors.transparent ? Colors.black : Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    },
+  );
+}
+
   }
 
-  static Color _statusColor(String status) {
+  Color _statusColor(String status) {
     switch (status) {
       case 'present':
         return Colors.green;
@@ -323,7 +516,6 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         return Colors.grey;
     }
   }
-}
 
 class WorkerCard extends StatelessWidget {
   final WorkerSummaryModel worker;
@@ -361,14 +553,14 @@ class WorkerCard extends StatelessWidget {
            worker.worker.imageUrl.isNotEmpty
   ? CircleAvatar(
       radius: 40,
-      backgroundColor: Colors.grey.shade200,
+      backgroundColor: const Color.fromARGB(255, 77, 196, 81),
       backgroundImage: NetworkImage(worker.worker.imageUrl),
       onBackgroundImageError: (_, __) {},
     )
   : CircleAvatar(
       radius: 40,
-      backgroundColor: Colors.grey.shade200,
-      child: const Icon(Icons.person_outline, size: 40, color: Colors.grey),
+      backgroundColor: const Color.fromARGB(255, 77, 196, 81),
+      child: const Icon(Icons.person, size: 40, color: Color.fromARGB(255, 255, 255, 255)),
     ),
 
 
