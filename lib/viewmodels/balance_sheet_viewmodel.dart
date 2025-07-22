@@ -30,7 +30,7 @@ class BalanceSheetViewModel extends StateNotifier<BalanceSheetState> {
 
       final duesSnap = await firestore.collection('dues').get();
 
-      double totalPrice = 0;
+      double totalSold = 0;
       double totalExpenses = 0;
       double totalProfit = 0;
       double dueAmounts = 0;
@@ -39,7 +39,7 @@ class BalanceSheetViewModel extends StateNotifier<BalanceSheetState> {
 
       for (var doc in ordersSnap.docs) {
         final data = doc.data();
-        totalPrice += (data['totalPrice'] ?? 0).toDouble();
+        totalSold += (data['totalAmount'] ?? 0).toDouble();
       }
 
       final List<ExpenseModel> expenses = [];
@@ -65,11 +65,11 @@ class BalanceSheetViewModel extends StateNotifier<BalanceSheetState> {
         }
       }
 
-      totalProfit = totalPrice - totalExpenses;
+      totalProfit = totalSold - totalExpenses;
 
       state = state.copyWith(
         isLoading: false,
-        totalPrice: totalPrice,
+        totalSold: totalSold,
         totalExpenses: totalExpenses,
         totalProfit: totalProfit,
         dueAmounts: dueAmounts,

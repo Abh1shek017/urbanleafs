@@ -4,7 +4,7 @@ class BalanceSheetState {
   final bool isLoading;
   final String? error;
 
-  final double totalPrice;
+  final double totalSold;
   final double totalExpenses;
   final double totalProfit;
   final double dueAmounts;
@@ -16,7 +16,7 @@ class BalanceSheetState {
   BalanceSheetState({
     this.isLoading = false,
     this.error,
-    this.totalPrice = 0,
+    this.totalSold = 0,
     this.totalExpenses = 0,
     this.totalProfit = 0,
     this.dueAmounts = 0,
@@ -28,7 +28,7 @@ class BalanceSheetState {
   BalanceSheetState copyWith({
     bool? isLoading,
     String? error,
-    double? totalPrice,
+    double? totalSold,
     double? totalExpenses,
     double? totalProfit,
     double? dueAmounts,
@@ -39,7 +39,7 @@ class BalanceSheetState {
     return BalanceSheetState(
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-      totalPrice: totalPrice ?? this.totalPrice,
+      totalSold: totalSold ?? this.totalSold,
       totalExpenses: totalExpenses ?? this.totalExpenses,
       totalProfit: totalProfit ?? this.totalProfit,
       dueAmounts: dueAmounts ?? this.dueAmounts,

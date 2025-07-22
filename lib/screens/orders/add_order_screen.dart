@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/master_data_service.dart';
-import '../../viewmodels/order_viewmodel.dart';
+// import '../../viewmodels/order_viewmodel.dart';
 import '../../utils/notifications_util.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AddOrderCard extends ConsumerStatefulWidget {
   const AddOrderCard({super.key});
@@ -33,27 +34,20 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
     _priceController.text = _price.toStringAsFixed(2);
     _loadMasterData();
   }
-Future<void> _loadMasterData() async {
-  // print("➡️ Start loading local JSON");
 
-  final sw = Stopwatch()..start();
-  final data = await masterDataService.loadLocalMasterData();
-  sw.stop();
-  // print("✅ Loaded JSON in ${sw.elapsedMilliseconds} ms: $data");
+  Future<void> _loadMasterData() async {
+    final data = await masterDataService.loadLocalMasterData();
+    final customers = data['customers'] ?? [];
+    final items = data['orderItems'] ?? [];
 
-  final customers = data['customers'] ?? [];
-  final items = data['orderItems'] ?? [];
-
-  if (mounted) {
-    setState(() {
-      _customerList = customers.map<String>((e) => e.toString()).toList();
-      _itemList = items.map<String>((e) => e.toString()).toList();
-      _loading = false;
-    });
-    // print("🎯 Dropdowns updated: customers $_customerList items $_itemList");
+    if (mounted) {
+      setState(() {
+        _customerList = customers.map<String>((e) => e.toString()).toList();
+        _itemList = items.map<String>((e) => e.toString()).toList();
+        _loading = false;
+      });
+    }
   }
-}
-
 
   void _resetForm() {
     _formKey.currentState?.reset();
@@ -65,6 +59,16 @@ Future<void> _loadMasterData() async {
       _priceController.text = '0.00';
     });
   }
+
+String _generateOrderId(String customer, String itemType) {
+  final now = DateTime.now();
+  final safeCustomer = customer.replaceAll(RegExp(r'[^\w]+'), '');
+  final safeItemType = itemType.replaceAll(RegExp(r'[^\w]+'), '');
+  final formattedDate = "${now.year}${now.month.toString().padLeft(2, '0')}"
+      "${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}"
+      "${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}";
+  return "${safeItemType}_${safeCustomer}_$formattedDate";
+}
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +96,6 @@ Future<void> _loadMasterData() async {
                       validator: (value) => value == null ? 'Please select a customer' : null,
                     ),
                     const SizedBox(height: 16),
-
                     Row(
                       children: [
                         Expanded(
@@ -130,7 +133,6 @@ Future<void> _loadMasterData() async {
                       ],
                     ),
                     const SizedBox(height: 16),
-
                     Row(
                       children: [
                         Expanded(
@@ -172,41 +174,63 @@ Future<void> _loadMasterData() async {
                       ],
                     ),
                     const SizedBox(height: 20),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         ElevatedButton(
-                          onPressed: () async {
-                            if (_formKey.currentState?.validate() ?? false) {
-                              final userId = "temp_user_id"; // TODO: real UID
-                              final orderData = {
-                                'description': _selectedItem,
-                                'quantity': _quantity,
-                                'totalPrice': _total,
-                                'customerName': _selectedCustomer,
-                                'orderTime': Timestamp.now(),
-                                'addedBy': userId,
-                              };
+                         onPressed: () async {
+  if (_formKey.currentState?.validate() ?? false) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userId = user?.uid;
 
-                              await ref.read(addOrderFutureProvider(orderData).future);
+    String addedBy = 'unknown_user';
 
-                              await addNotification(
-                                'orders',
-                                'New Order',
-                                'Order for $_selectedItem ($_quantity pcs) by $_selectedCustomer',
-                              );
+    if (userId != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+        final userData = userDoc.data();
 
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Order added successfully'),
-                                  ),
-                                );
-                                _resetForm();
-                              }
-                            }
-                          },
+        if (userData != null && userData.containsKey('username')) {
+          addedBy = userData['username'];
+        } else {
+          print("⚠️ Username not found in user document: ${userDoc.id}");
+        }
+      } catch (e) {
+        print("🔥 Error fetching user document: $e");
+      }
+    } else {
+      print("🚫 FirebaseAuth returned null user.");
+    }
+
+    final now = DateTime.now();
+    final docId = _generateOrderId(_selectedCustomer!, _selectedItem!);
+
+    final orderData = {
+      'description': _selectedItem,
+      'quantity': _quantity,
+      'totalAmount': _total,
+      'customerName': _selectedCustomer,
+      'orderTime': Timestamp.fromDate(now),
+      'addedBy': addedBy,
+    };
+
+    await FirebaseFirestore.instance.collection('orders').doc(docId).set(orderData);
+
+    await addNotification(
+      'orders',
+      'New Order',
+      'Order for $_selectedItem ($_quantity pcs) by $_selectedCustomer',
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order added successfully')),
+      );
+      _resetForm();
+    }
+  }
+},
+
                           child: const Text('Add Order'),
                         ),
                         const SizedBox(width: 12),

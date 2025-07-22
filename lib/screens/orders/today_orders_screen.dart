@@ -21,10 +21,11 @@ class TodayOrdersScreen extends ConsumerWidget {
               child: AddOrderCard(), // The embedded reusable form
             ),
             ordersAsync.when(
-              loading: () => const Center(child: Padding(
-                padding: EdgeInsets.all(20.0),
-                child: CircularProgressIndicator(),
-              )),
+              loading: () => const Center(
+                    child: Padding(
+                  padding: EdgeInsets.all(20.0),
+                  child: CircularProgressIndicator(),
+                )),
               error: (err, stack) => Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Center(child: Text('Error: $err')),
@@ -44,6 +45,7 @@ class TodayOrdersScreen extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final order = orders[index];
                     final formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(order.orderTime);
+                    final amount = (order.totalAmount).toDouble(); // ✅ Safe cast
 
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -62,7 +64,7 @@ class TodayOrdersScreen extends ConsumerWidget {
                             const SizedBox(height: 4),
                             Text("Item: ${order.description}"),
                             Text("Qty: ${order.quantity}"),
-                            Text("Price: ₹${order.totalPrice.toStringAsFixed(2)}"),
+                            Text("Price: ₹${amount.toStringAsFixed(2)}"), // ✅ Safe usage
                             Text("Time: $formattedDate",
                                 style: const TextStyle(color: Colors.grey)),
                           ],

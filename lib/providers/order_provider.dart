@@ -12,3 +12,11 @@ final todaysOrdersStreamProvider = StreamProvider.autoDispose<List<OrderModel>>(
     return repository.getTodaysOrders();
   },
 );
+
+// ✅ New: Stream provider for all orders (used in balance sheet)
+final allOrdersProvider = StreamProvider<List<OrderModel>>(
+  (ref) {
+    final repository = ref.watch(orderRepositoryProvider);
+    return repository.getAllOrders(); // You must define this in the repo
+  },
+);

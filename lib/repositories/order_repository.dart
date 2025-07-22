@@ -30,4 +30,15 @@ class OrderRepository extends BaseRepository {
   Future<void> addOrder(Map<String, dynamic> orderData) async {
     await collection.add(orderData);
   }
+
+  /// ✅ New: Stream of all orders (for Balance Sheet)
+  Stream<List<OrderModel>> getAllOrders() {
+    return collection
+        .orderBy('orderTime', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList(),
+        );
+  }
 }

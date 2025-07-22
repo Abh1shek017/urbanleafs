@@ -4,7 +4,7 @@ class OrderModel {
   final String id;
   final String description;
   final int quantity;
-  final double totalPrice;
+  final double totalAmount;
   final String customerName;
   final DateTime orderTime;
   final String addedBy;
@@ -13,22 +13,27 @@ class OrderModel {
     required this.id,
     required this.description,
     required this.quantity,
-    required this.totalPrice,
+    required this.totalAmount,
     required this.customerName,
     required this.orderTime,
     required this.addedBy,
   });
 
   factory OrderModel.fromSnapshot(DocumentSnapshot snapshot) {
-    final data = snapshot.data() as Map<String, dynamic>;
+    final data = snapshot.data() as Map<String, dynamic>?;
+
     return OrderModel(
       id: snapshot.id,
-      description: data['description'],
-      quantity: data['quantity'],
-      totalPrice: (data['totalPrice'] as num).toDouble(),
-      customerName: data['customerName'],
-      orderTime: (data['orderTime'] as Timestamp).toDate(),
-      addedBy: data['addedBy'],
+      description: data?['description'] ?? 'Unknown Item',
+      quantity: (data?['quantity'] ?? 0) as int,
+      totalAmount: (data?['totalAmount'] is num)
+          ? (data!['totalAmount'] as num).toDouble()
+          : 0.0,
+      customerName: data?['customerName'] ?? 'Unknown Customer',
+      orderTime: (data?['orderTime'] is Timestamp)
+          ? (data!['orderTime'] as Timestamp).toDate()
+          : DateTime.now(),
+      addedBy: data?['addedBy'] ?? 'Unknown',
     );
   }
 
@@ -36,7 +41,7 @@ class OrderModel {
     return {
       'description': description,
       'quantity': quantity,
-      'totalPrice': totalPrice,
+      'totalAmount': totalAmount,
       'customerName': customerName,
       'orderTime': orderTime,
       'addedBy': addedBy,

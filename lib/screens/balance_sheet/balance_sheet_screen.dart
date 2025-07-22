@@ -18,6 +18,7 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
   int selectedYear = DateTime.now().year;
   DateTimeRange? customRange;
   double _cardScale = 1.0;
+
   // final int dueCustomerCount;
   final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
@@ -253,12 +254,35 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
             children: [
-              _buildSummaryCard(
-                'Total Sold',
-                '₹${state.totalPrice.toStringAsFixed(2)}',
-                Colors.green[300]!,
-                () => _showTotalSoldDetails(context),
-              ),
+              FutureBuilder<double>(
+  future: _calculateTotalSold(),
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return _buildSummaryCard(
+        'Total Sold',
+        'Loading...',
+        Colors.green[300]!,
+        () {}, // disabled during loading
+      );
+    } else if (snapshot.hasError) {
+      return _buildSummaryCard(
+        'Total Sold',
+        'Error',
+        Colors.green[300]!,
+        () {},
+      );
+    } else {
+      final total = snapshot.data ?? 0.0;
+      return _buildSummaryCard(
+        'Total Sold',
+        '₹${total.toStringAsFixed(2)}',
+        Colors.green[300]!,
+        () => _showTotalSoldDetails(context),
+      );
+    }
+  },
+),
+
               _buildSummaryCard(
                 'Total Expenses',
                 '₹${state.totalExpenses.toStringAsFixed(2)}',
@@ -462,30 +486,44 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     );
   }
 
-  Future<List<Map<String, dynamic>>> _fetchOrdersForPeriod() async {
-    final range = _getSelectedRange();
+Future<List<Map<String, dynamic>>> _fetchOrdersForPeriod() async {
+  final range = _getSelectedRange();
 
-    final snap = await FirebaseFirestore.instance
-        .collection('orders')
-        .where('orderTime', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
-        .where(
-          'orderTime',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(range.start),
-        )
-        .get();
+  final snap = await FirebaseFirestore.instance
+      .collection('orders')
+      .where('orderTime', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
+      .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
+      .get();
 
-    final list = snap.docs.map((doc) {
-      final d = doc.data();
-      return {
-        'id': doc.id,
-        'totalPrice': (d['totalPrice'] as num?)?.toDouble() ?? 0.0,
-        'customerName': d['customerName'] ?? 'Unknown',
-        'orderTime': (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      };
-    }).toList();
+  final list = snap.docs.map((doc) {
+    final d = doc.data();
+    return {
+      'id': doc.id,
+      'totalSold': (d['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      'customerName': d['customerName'] ?? 'Unknown',
+      'orderTime': (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    };
+  }).toList();
 
-    return list.reversed.toList();
+  return list.reversed.toList();
+}
+Future<double> _calculateTotalSold() async {
+  final orders = await _fetchOrdersForPeriod();
+
+  double total = 0.0;
+
+  for (final order in orders) {
+    final rawAmount = order['totalSold'];
+    if (rawAmount is num) {
+      total += rawAmount.toDouble();
+    } else if (rawAmount is String) {
+      total += double.tryParse(rawAmount) ?? 0.0;
+    }
   }
+
+  return total;
+}
+
 
   Future<List<Map<String, dynamic>>> _fetchExpensesForPeriod({
     String? filterType,
@@ -544,16 +582,42 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     return customRange ?? DateTimeRange(start: start, end: end);
   }
 
-  void _showTotalSoldDetails(BuildContext context) async {
-    final orders = await _fetchOrdersForPeriod();
+void _showTotalSoldDetails(BuildContext context) async {
+  final orders = await _fetchOrdersForPeriod();
 
-    if (context.mounted) {
-      _showDataSheet(context, 'Total Sold Details', orders, (order) {
-        print('🔥 Order Debug: $order');
+  double totalSold = 0.0;
 
-        final amount = (order['totalPrice'] is num)
-            ? (order['totalPrice'] as num).toDouble()
-            : 0.0;
+  for (final order in orders) {
+    final rawAmount = order['totalSold'] ?? order['totalAmount'];
+
+    if (rawAmount is int) {
+      totalSold += rawAmount.toDouble();
+    } else if (rawAmount is double) {
+      totalSold += rawAmount;
+    } else if (rawAmount is String) {
+      totalSold += double.tryParse(rawAmount) ?? 0.0;
+    } else {
+      print('❌ Unknown amount type: $rawAmount');
+    }
+  }
+  if (context.mounted) {
+    _showDataSheet(
+      context,
+      'Total Sold Details',
+      orders,
+      (order) {
+        double amount = 0.0;
+        final rawAmount = order['totalSold'] ?? order['totalAmount'] ?? 0.0;
+
+        if (rawAmount is int) {
+          amount = rawAmount.toDouble();
+        } else if (rawAmount is double) {
+          amount = rawAmount;
+        } else if (rawAmount is String) {
+          amount = double.tryParse(rawAmount) ?? 0.0;
+        } else {
+          amount = 0.0;
+        }
 
         final customer = order['customerName']?.toString() ?? 'Unknown';
 
@@ -563,6 +627,7 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
         } else if (order['orderTime'] is DateTime) {
           orderDate = order['orderTime'];
         }
+
         final date = orderDate != null
             ? dateFormat.format(orderDate)
             : 'Unknown';
@@ -580,7 +645,10 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
           child: ListTile(
             title: Text(
               '₹${amount.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -599,9 +667,10 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             ),
           ),
         );
-      });
-    }
+      },
+    );
   }
+}
 
   void _showTotalExpensesDetails(
     BuildContext context, {
