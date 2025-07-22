@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/balance_sheet_provider.dart';
+import '../../models/balance_sheet_state.dart';
+import '../../models/expense_model.dart';
 
 class BalanceSheetScreen extends ConsumerStatefulWidget {
   const BalanceSheetScreen({super.key});
@@ -16,6 +18,7 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
   int selectedYear = DateTime.now().year;
   DateTimeRange? customRange;
   double _cardScale = 1.0;
+  // final int dueCustomerCount;
   final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
   @override
@@ -30,9 +33,11 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     final monthIndex = DateFormat('MMMM').parse(selectedMonth).month;
     final start = DateTime(selectedYear, monthIndex, 1);
     final end = DateTime(selectedYear, monthIndex + 1, 0, 23, 59, 59);
-    ref.read(balanceSheetViewModelProvider.notifier).loadData(
-      range: DateTimeRange(start: start, end: end),
-    );
+    ref
+        .read(balanceSheetViewModelProvider.notifier)
+        .loadData(
+          range: DateTimeRange(start: start, end: end),
+        );
   }
 
   void _loadDataForCustom(DateTimeRange range) {
@@ -59,10 +64,10 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
           children: [
             _buildFilterSection(),
             Transform(
-  transform: Matrix4.identity()..scale(1.0, _cardScale),
-  alignment: Alignment.topCenter,
-  child: _buildSummaryGrid(state),
-),
+              transform: Matrix4.identity()..scale(1.0, _cardScale),
+              alignment: Alignment.topCenter,
+              child: _buildSummaryGrid(state),
+            ),
 
             const Divider(),
             if (state.isLoading)
@@ -83,6 +88,56 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     );
   }
 
+  void _applyQuickFilter(String key) {
+    final range = _getRangeFromQuickFilter(key);
+    setState(() {
+      customRange = range;
+    });
+    _loadDataForCustom(range);
+  }
+
+  DateTimeRange _getRangeFromQuickFilter(String key) {
+    final now = DateTime.now();
+
+    switch (key) {
+      case 'this_month':
+        return DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: DateTime(now.year, now.month + 1, 0, 23, 59, 59),
+        );
+      case 'last_month':
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        return DateTimeRange(
+          start: lastMonth,
+          end: DateTime(lastMonth.year, lastMonth.month + 1, 0, 23, 59, 59),
+        );
+      case 'this_quarter':
+        final quarterStartMonth = ((now.month - 1) ~/ 3) * 3 + 1;
+        return DateTimeRange(
+          start: DateTime(now.year, quarterStartMonth, 1),
+          end: DateTime(now.year, quarterStartMonth + 3, 0, 23, 59, 59),
+        );
+      case 'half_year':
+        final sixMonthsAgo = DateTime(now.year, now.month - 5, 1);
+        return DateTimeRange(
+          start: sixMonthsAgo,
+          end: DateTime(now.year, now.month + 1, 0, 23, 59, 59),
+        );
+      case 'this_year':
+        return DateTimeRange(
+          start: DateTime(now.year, 1, 1),
+          end: DateTime(now.year, 12, 31, 23, 59, 59),
+        );
+      case 'last_year':
+        return DateTimeRange(
+          start: DateTime(now.year - 1, 1, 1),
+          end: DateTime(now.year - 1, 12, 31, 23, 59, 59),
+        );
+      default:
+        return DateTimeRange(start: now, end: now);
+    }
+  }
+
   Widget _buildFilterSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -99,13 +154,17 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
               onChanged: (val) {
                 if (val != null) {
                   final now = DateTime.now();
-                  final selectedMonthIndex =
-                      DateFormat('MMMM').parse(val).month;
+                  final selectedMonthIndex = DateFormat(
+                    'MMMM',
+                  ).parse(val).month;
                   if (selectedYear == now.year &&
                       selectedMonthIndex > now.month) {
                     return;
                   }
-                  setState(() => selectedMonth = val);
+                  setState(() {
+                    selectedMonth = val;
+                    customRange = null;
+                  });
                   _loadDataForCurrentMonth();
                 }
               },
@@ -121,13 +180,18 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             onChanged: (val) {
               if (val != null) {
                 final now = DateTime.now();
-                final selectedMonthIndex =
-                    DateFormat('MMMM').parse(selectedMonth).month;
+                final selectedMonthIndex = DateFormat(
+                  'MMMM',
+                ).parse(selectedMonth).month;
                 if (val == now.year && selectedMonthIndex > now.month) {
-                  setState(() =>
-                      selectedMonth = DateFormat('MMMM').format(now));
+                  setState(
+                    () => selectedMonth = DateFormat('MMMM').format(now),
+                  );
                 }
-                setState(() => selectedYear = val);
+                setState(() {
+                  selectedYear = val;
+                  customRange = null;
+                });
                 _loadDataForCurrentMonth();
               }
             },
@@ -147,6 +211,31 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             },
             child: const Text('Custom Range'),
           ),
+          const SizedBox(width: 4),
+          PopupMenuButton<String>(
+            onSelected: _applyQuickFilter,
+            icon: const Icon(Icons.filter_alt_outlined),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'this_month',
+                child: Text('This Month'),
+              ),
+              const PopupMenuItem(
+                value: 'last_month',
+                child: Text('Last Month'),
+              ),
+              const PopupMenuItem(
+                value: 'this_quarter',
+                child: Text('This Quarter'),
+              ),
+              const PopupMenuItem(
+                value: 'half_year',
+                child: Text('Last 6 Months'),
+              ),
+              const PopupMenuItem(value: 'this_year', child: Text('This Year')),
+              const PopupMenuItem(value: 'last_year', child: Text('Last Year')),
+            ],
+          ),
         ],
       ),
     );
@@ -155,53 +244,56 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
   Widget _buildSummaryGrid(BalanceSheetState state) {
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: GridView.count(
-        crossAxisCount: 3,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
+      child: Column(
         children: [
-          _buildSummaryCard('Total Sold',
-              '₹${state.totalSold.toStringAsFixed(2)}', Colors.green[100]!, () {
-            _showTotalSoldDetails(context);
-          }),
-          _buildSummaryCard(
-              'Total Expenses',
-              '₹${state.totalExpenses.toStringAsFixed(2)}',
-              Colors.red[100]!, () {
-            _showTotalExpensesDetails(context);
-          }),
-          _buildSummaryCard(
-              'Total Profit',
-              '₹${state.totalProfit.toStringAsFixed(2)}',
-              Colors.blue[100]!, () {
-            _showProfitDetails(
-              context,
-              state.totalSold,
-              state.totalExpenses,
-              state.totalProfit,
-            );
-          }),
-          _buildSummaryCard(
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            children: [
+              _buildSummaryCard(
+                'Total Sold',
+                '₹${state.totalPrice.toStringAsFixed(2)}',
+                Colors.green[300]!,
+                () => _showTotalSoldDetails(context),
+              ),
+              _buildSummaryCard(
+                'Total Expenses',
+                '₹${state.totalExpenses.toStringAsFixed(2)}',
+                Colors.red[300]!,
+                () => _showTotalExpensesDetails(context, excludeRaw: true),
+              ),
+              _buildSummaryCard(
+                'Raw Purchases',
+                '₹${state.rawPurchases.toStringAsFixed(2)}',
+                Colors.grey[400]!,
+                () => _showRawPurchasesDetails(context),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: _buildSummaryCard(
               'Due Amounts',
-              '₹${state.dueAmounts.toStringAsFixed(2)}',
-              Colors.orange[100]!, () {
-            _showDueAmountsDetails(context);
-          }),
-          _buildSummaryCard(
-              'Raw Purchases',
-              '₹${state.rawPurchases.toStringAsFixed(2)}',
-              Colors.grey[300]!, () {
-            _showRawPurchasesDetails(context);
-          }),
+              '₹${state.dueAmounts.toStringAsFixed(2)} from ${state.dueCustomerCount} Customers',
+              Colors.orange[400]!,
+              () => _showDueAmountsDetails(context),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildSummaryCard(
-      String title, String amount, Color color, VoidCallback onTap) {
+    String title,
+    String amount,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -222,9 +314,10 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
             const SizedBox(height: 6),
             Text(amount, style: const TextStyle(fontSize: 16)),
           ],
@@ -259,8 +352,10 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(exp.description,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  exp.description,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Text('₹${exp.amount.toStringAsFixed(2)}'),
                 Text('Type: ${exp.type}'),
                 Text('Added: ${dateFormat.format(exp.addedAt)}'),
@@ -274,7 +369,7 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
 
   Color _getBgColor(String type) {
     switch (type) {
-      case 'rawMaterial':
+      case 'RAW Material':
         return Colors.grey[200]!;
       case 'labor':
       case 'transportation':
@@ -309,8 +404,12 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     );
   }
 
-  void _showDataSheet<T>(BuildContext context, String title, List<T> data,
-      Widget Function(T) itemBuilder) {
+  void _showDataSheet<T>(
+    BuildContext context,
+    String title,
+    List<T> data,
+    Widget Function(T) itemBuilder,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -336,9 +435,13 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
               Expanded(
                 child: data.isEmpty
@@ -361,33 +464,48 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
 
   Future<List<Map<String, dynamic>>> _fetchOrdersForPeriod() async {
     final range = _getSelectedRange();
+
     final snap = await FirebaseFirestore.instance
         .collection('orders')
         .where('orderTime', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
-        .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
+        .where(
+          'orderTime',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(range.start),
+        )
         .get();
 
-    return snap.docs.map((doc) {
-      final d = (doc.data() as Map<String, dynamic>?) ?? {};
+    final list = snap.docs.map((doc) {
+      final d = doc.data();
       return {
         'id': doc.id,
-        'amount': (d['totalAmount'] ?? 0).toDouble(),
-        'customer': d['customerName'] ?? 'N/A',
-        'date': (d['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        'totalPrice': (d['totalPrice'] as num?)?.toDouble() ?? 0.0,
+        'customerName': d['customerName'] ?? 'Unknown',
+        'orderTime': (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
       };
     }).toList();
+
+    return list.reversed.toList();
   }
 
-  Future<List<Map<String, dynamic>>> _fetchExpensesForPeriod({String? filterType}) async {
+  Future<List<Map<String, dynamic>>> _fetchExpensesForPeriod({
+    String? filterType,
+  }) async {
     final range = _getSelectedRange();
     Query q = FirebaseFirestore.instance
         .collection('expenses')
-        .where('addedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
+        .where(
+          'addedAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(range.start),
+        )
         .where('addedAt', isLessThanOrEqualTo: Timestamp.fromDate(range.end));
-    if (filterType != null) q = q.where('type', isEqualTo: filterType);
+
+    if (filterType != null) {
+      q = q.where('type', isEqualTo: filterType);
+    }
 
     final snap = await q.get();
-    return snap.docs.map((doc) {
+
+    final expensesList = snap.docs.map((doc) {
       final d = (doc.data() as Map<String, dynamic>?) ?? {};
       return {
         'description': d['description'] ?? '',
@@ -396,6 +514,8 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
         'addedAt': (d['addedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       };
     }).toList();
+
+    return expensesList.reversed.toList();
   }
 
   Future<List<Map<String, dynamic>>> _fetchDueOrdersForPeriod() async {
@@ -426,43 +546,56 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
 
   void _showTotalSoldDetails(BuildContext context) async {
     final orders = await _fetchOrdersForPeriod();
+
     if (context.mounted) {
       _showDataSheet(context, 'Total Sold Details', orders, (order) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.green[50],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(8),
-          child: ListTile(
-            title: Text('₹${order['amount'].toStringAsFixed(2)}'),
-            subtitle: Text('Customer: ${order['customer']}\n'
-                'Date: ${dateFormat.format(order['date'])}'),
-            trailing: Text('#${order['id'].substring(0, 6)}'),
-          ),
-        );
-      });
-    }
-  }
+        print('🔥 Order Debug: $order');
 
-  void _showTotalExpensesDetails(BuildContext context) async {
-    final expenses = await _fetchExpensesForPeriod();
-    if (context.mounted) {
-      _showDataSheet(context, 'Total Expenses Details', expenses, (exp) {
+        final amount = (order['totalPrice'] is num)
+            ? (order['totalPrice'] as num).toDouble()
+            : 0.0;
+
+        final customer = order['customerName']?.toString() ?? 'Unknown';
+
+        DateTime? orderDate;
+        if (order['orderTime'] is Timestamp) {
+          orderDate = (order['orderTime'] as Timestamp).toDate();
+        } else if (order['orderTime'] is DateTime) {
+          orderDate = order['orderTime'];
+        }
+        final date = orderDate != null
+            ? dateFormat.format(orderDate)
+            : 'Unknown';
+
+        final id = order['id']?.toString() ?? '';
+        final shortId = id.length >= 6 ? id.substring(0, 6) : id;
+
         return Container(
           decoration: BoxDecoration(
-            color: Colors.red[50],
-            borderRadius: BorderRadius.circular(8),
+            color: Colors.green[100],
+            borderRadius: BorderRadius.circular(10),
           ),
           margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
           child: ListTile(
-            title: Text(exp['description']),
-            subtitle: Text(
-              '₹${exp['amount'].toStringAsFixed(2)}\n'
-              'Type: ${exp['type']}\n'
-              'Date: ${dateFormat.format(exp['addedAt'])}',
+            title: Text(
+              '₹${amount.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Customer: $customer\nDate: $date',
+                style: const TextStyle(height: 1.4),
+              ),
+            ),
+            trailing: Text(
+              '#$shortId',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.black54,
+              ),
             ),
           ),
         );
@@ -470,52 +603,129 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     }
   }
 
-  void _showProfitDetails(
-      BuildContext context, double sold, double expenses, double profit) {
-    _showDataSheet(
-      context,
-      'Profit Calculation',
-      [
-        {'sold': sold, 'expenses': expenses, 'profit': profit},
-      ],
-      (data) {
+  void _showTotalExpensesDetails(
+    BuildContext context, {
+    bool excludeRaw = false,
+  }) async {
+    final expenses = await _fetchExpensesForPeriod();
+
+    // Optionally filter out raw purchases
+    final filteredExpenses = excludeRaw
+        ? expenses
+              .where((e) => e['type'].toLowerCase() != 'raw material')
+              .toList()
+        : expenses;
+
+    if (context.mounted) {
+      _showDataSheet(context, 'Total Expenses Details', filteredExpenses, (
+        exp,
+      ) {
+        final amount = (exp['amount'] as num?)?.toDouble() ?? 0.0;
+        final type = exp['type'] ?? 'N/A';
+        final addedAt = exp['addedAt'] as DateTime?;
+        final date = addedAt != null ? dateFormat.format(addedAt) : 'Unknown';
+
         return Container(
           decoration: BoxDecoration(
-            color: Colors.blue[50],
-            borderRadius: BorderRadius.circular(8),
+            color: Colors.red[100],
+            borderRadius: BorderRadius.circular(10),
           ),
           margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Total Sold: ₹${sold.toStringAsFixed(2)}'),
-              Text('Total Expenses: ₹${expenses.toStringAsFixed(2)}'),
-              const Divider(),
-              Text('Total Profit: ₹${profit.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-            ],
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          child: ListTile(
+            title: Text(
+              exp['description'] ?? 'No Description',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Amount: ₹${amount.toStringAsFixed(2)}\n'
+                'Type: $type\n'
+                'Date: $date',
+                style: const TextStyle(height: 1.4),
+              ),
+            ),
           ),
         );
-      },
-    );
+      });
+    }
   }
+
+  // void _showProfitDetails(
+  //     BuildContext context, double sold, double expenses, double profit) {
+  //   _showDataSheet(
+  //     context,
+  //     'Profit Calculation',
+  //     [
+  //       {'sold': sold, 'expenses': expenses, 'profit': profit},
+  //     ],
+  //     (data) {
+  //       return Container(
+  //         decoration: BoxDecoration(
+  //           color: Colors.blue[50],
+  //           borderRadius: BorderRadius.circular(8),
+  //         ),
+  //         margin: const EdgeInsets.symmetric(vertical: 4),
+  //         padding: const EdgeInsets.all(8),
+  //         child: Column(
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Text('Total Sold: ₹${sold.toStringAsFixed(2)}'),
+  //             Text('Total Expenses: ₹${expenses.toStringAsFixed(2)}'),
+  //             const Divider(),
+  //             Text('Total Profit: ₹${profit.toStringAsFixed(2)}',
+  //                 style: const TextStyle(fontWeight: FontWeight.bold)),
+  //           ],
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
   void _showDueAmountsDetails(BuildContext context) async {
     final dues = await _fetchDueOrdersForPeriod();
+    // Sort dues by descending date
+    dues.sort((a, b) {
+      final dateA = a['date'] as DateTime?;
+      final dateB = b['date'] as DateTime?;
+      return dateB?.compareTo(dateA ?? DateTime(0)) ?? 0;
+    });
+
     if (context.mounted) {
       _showDataSheet(context, 'Due Amounts Details', dues, (order) {
+        final dueAmount = (order['dueAmount'] as num?)?.toDouble() ?? 0.0;
+        final customer = order['customer'] ?? 'Unknown';
+        final date = (order['date'] is DateTime)
+            ? dateFormat.format(order['date'])
+            : 'Unknown';
+
         return Container(
           decoration: BoxDecoration(
-            color: Colors.orange[50],
-            borderRadius: BorderRadius.circular(8),
+            color: Colors.orange[100],
+            borderRadius: BorderRadius.circular(10),
           ),
           margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
           child: ListTile(
-            title: Text('₹${order['dueAmount'].toStringAsFixed(2)}'),
-            subtitle: Text('Customer: ${order['customer']}\n'
-                'Date: ${dateFormat.format(order['date'])}'),
+            title: Text(
+              '₹${dueAmount.toStringAsFixed(2)}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Customer: $customer',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Date: $date'),
+                ],
+              ),
+            ),
           ),
         );
       });
@@ -523,21 +733,41 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
   }
 
   void _showRawPurchasesDetails(BuildContext context) async {
-    final expenses = await _fetchExpensesForPeriod(filterType: 'rawMaterial');
+    final expenses = await _fetchExpensesForPeriod(filterType: 'RAW Material');
+
+    // Sort by addedAt descending
+    expenses.sort((a, b) {
+      final dateA = a['addedAt'] as DateTime?;
+      final dateB = b['addedAt'] as DateTime?;
+      return dateB?.compareTo(dateA ?? DateTime(0)) ?? 0;
+    });
+
     if (context.mounted) {
       _showDataSheet(context, 'Raw Purchases Details', expenses, (exp) {
+        final amount = (exp['amount'] as num?)?.toDouble() ?? 0.0;
+        final desc = exp['description'] ?? 'Unknown';
+        final date = (exp['addedAt'] is DateTime)
+            ? dateFormat.format(exp['addedAt'])
+            : 'Unknown';
+
         return Container(
           decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(8),
+            color: Colors.grey[350],
+            borderRadius: BorderRadius.circular(10),
           ),
           margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
           child: ListTile(
-            title: Text(exp['description']),
-            subtitle: Text(
-              '₹${exp['amount'].toStringAsFixed(2)}\n'
-              'Date: ${dateFormat.format(exp['addedAt'])}',
+            title: Text(
+              desc,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '₹${amount.toStringAsFixed(2)}\nDate: $date',
+                style: const TextStyle(fontSize: 13),
+              ),
             ),
           ),
         );
