@@ -1,4 +1,5 @@
-import '../models/expense_model.dart'; // adjust path as needed
+import '../models/expense_model.dart';
+import '../models/transaction_entry.dart';
 
 class BalanceSheetState {
   final bool isLoading;
@@ -11,7 +12,8 @@ class BalanceSheetState {
   final double rawPurchases;
   final int dueCustomerCount;
 
-  final List<ExpenseModel> expenses; // ✅ Add this line
+  final List<TransactionEntry> transactions;
+  final List<ExpenseModel> expenses;
 
   BalanceSheetState({
     this.isLoading = false,
@@ -22,7 +24,8 @@ class BalanceSheetState {
     this.dueAmounts = 0,
     this.rawPurchases = 0,
     this.dueCustomerCount = 0,
-    this.expenses = const [], // ✅ Default empty list
+    this.expenses = const [],
+    this.transactions = const [],
   });
 
   BalanceSheetState copyWith({
@@ -34,7 +37,8 @@ class BalanceSheetState {
     double? dueAmounts,
     double? rawPurchases,
     int? dueCustomerCount,
-    List<ExpenseModel>? expenses, // ✅ Add this
+    List<ExpenseModel>? expenses,
+    List<TransactionEntry>? transactions,
   }) {
     return BalanceSheetState(
       isLoading: isLoading ?? this.isLoading,
@@ -45,7 +49,8 @@ class BalanceSheetState {
       dueAmounts: dueAmounts ?? this.dueAmounts,
       rawPurchases: rawPurchases ?? this.rawPurchases,
       dueCustomerCount: dueCustomerCount ?? this.dueCustomerCount,
-      expenses: expenses ?? this.expenses, // ✅ Copy this
+      expenses: expenses ?? this.expenses,
+      transactions: transactions ?? this.transactions,
     );
   }
 }

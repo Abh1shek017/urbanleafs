@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/balance_sheet_provider.dart';
 import '../../models/balance_sheet_state.dart';
-import '../../models/expense_model.dart';
+import '../../models/transaction_entry.dart';
 
 class BalanceSheetScreen extends ConsumerStatefulWidget {
   const BalanceSheetScreen({super.key});
@@ -35,59 +35,67 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     final start = DateTime(selectedYear, monthIndex, 1);
     final end = DateTime(selectedYear, monthIndex + 1, 0, 23, 59, 59);
     ref
-        .read(balanceSheetViewModelProvider.notifier)
+        .read(balanceSheetProvider.notifier)
         .loadData(
           range: DateTimeRange(start: start, end: end),
         );
   }
 
   void _loadDataForCustom(DateTimeRange range) {
-    ref.read(balanceSheetViewModelProvider.notifier).loadData(range: range);
+    ref.read(balanceSheetProvider.notifier).loadData(range: range);
   }
+@override
+Widget build(BuildContext context) {
+  final state = ref.watch(balanceSheetProvider);
 
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(balanceSheetViewModelProvider);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Balance Sheet')),
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (scrollNotification) {
-          if (scrollNotification is ScrollUpdateNotification) {
-            setState(() {
-              _cardScale = (1.0 - (scrollNotification.metrics.pixels / 200))
-                  .clamp(0.85, 1.0);
-            });
-          }
-          return false;
-        },
-        child: ListView(
-          children: [
-            _buildFilterSection(),
-            Transform(
-              transform: Matrix4.identity()..scale(1.0, _cardScale),
-              alignment: Alignment.topCenter,
-              child: _buildSummaryGrid(state),
-            ),
-
-            const Divider(),
-            if (state.isLoading)
-              const Padding(
-                padding: EdgeInsets.all(20),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (state.error != null)
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Center(child: Text('Error: ${state.error}')),
-              )
-            else
-              _buildTransactionList(state.expenses),
-          ],
+  return Scaffold(
+    appBar: AppBar(title: const Text('Balance Sheet')),
+    body: Column(
+      children: [
+        Material(
+          elevation: 2,
+          child: _buildFilterSection(), // Fixed filter
         ),
-      ),
-    );
-  }
+        Expanded(
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (scrollNotification) {
+              if (scrollNotification is ScrollUpdateNotification) {
+                setState(() {
+                  _cardScale = (1.0 - (scrollNotification.metrics.pixels / 200))
+                      .clamp(0.85, 1.0);
+                });
+              }
+              return false;
+            },
+            child: ListView(
+              padding: const EdgeInsets.only(top: 8),
+              children: [
+                Transform(
+                  transform: Matrix4.identity()..scale(1.0, _cardScale),
+                  alignment: Alignment.topCenter,
+                  child: _buildSummaryGrid(state),
+                ),
+                const Divider(),
+                if (state.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (state.error != null)
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Center(child: Text('Error: ${state.error}')),
+                  )
+                else
+                  _buildTransactionList(state.transactions),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   void _applyQuickFilter(String key) {
     final range = _getRangeFromQuickFilter(key);
@@ -349,84 +357,78 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
       ),
     );
   }
+Widget _buildTransactionList(List<TransactionEntry> transactions) {
+  if (transactions.isEmpty) {
+    return const Center(child: Text('No transactions found for this period.'));
+  }
 
-  Widget _buildTransactionList(List<ExpenseModel> expenses) {
-    if (expenses.isEmpty) {
-      return const Center(
-        child: Text('No transactions found for this period.'),
-      );
-    }
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: expenses.length,
-      itemBuilder: (context, index) {
-        final exp = expenses[index];
-        final bgColor = _getBgColor(exp.type);
-        return GestureDetector(
-          onTap: () => _showTransactionDetail(context, exp),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  exp.description,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text('₹${exp.amount.toStringAsFixed(2)}'),
-                Text('Type: ${exp.type}'),
-                Text('Added: ${dateFormat.format(exp.addedAt)}'),
-              ],
-            ),
+  return ListView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: transactions.length,
+    itemBuilder: (context, index) {
+      final tx = transactions[index];
+      final bgColor = tx.type == 'sold'
+          ? const Color.fromARGB(255, 78, 184, 81) // Greenish for sales
+          : const Color.fromARGB(255, 176, 57, 10); // Reddish for expenses
+
+      return GestureDetector(
+        onTap: () => _showTransactionDetail(context, tx), // 👈 shows full info on tap
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(12),
           ),
-        );
-      },
-    );
-  }
-
-  Color _getBgColor(String type) {
-    switch (type) {
-      case 'RAW Material':
-        return Colors.grey[200]!;
-      case 'labor':
-      case 'transportation':
-      case 'other':
-        return Colors.red[50]!;
-      default:
-        return Colors.green[50]!;
-    }
-  }
-
-  void _showTransactionDetail(BuildContext context, ExpenseModel exp) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(exp.description),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Amount: ₹${exp.amount.toStringAsFixed(2)}'),
-            Text('Type: ${exp.type}'),
-            Text('Added: ${dateFormat.format(exp.addedAt)}'),
-          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tx.type == 'sold'
+                    ? 'Customer: ${tx.description}' // 👈 stored as description
+                    : 'Expense: ${tx.description}',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              Text('₹${tx.amount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white)),
+              if (tx.type == 'sold')
+                Text('Item Type: ${tx.itemType ?? 'Unknown'}',
+                    style: const TextStyle(color: Colors.white)),
+              Text('Date: ${dateFormat.format(tx.addedAt)}',
+                  style: const TextStyle(color: Colors.white)),
+              Text('Type: ${tx.type.toUpperCase()}', style: const TextStyle(color: Colors.white)),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
+      );
+    },
+  );
+}
+
+
+void _showTransactionDetail(BuildContext context, TransactionEntry tx) {
+  final isExpense = tx.type == 'expense';
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text(tx.description),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Amount: ₹${tx.amount.toStringAsFixed(2)}'),
+          if (tx.itemType != null) Text('Item Type: ${tx.itemType}'),
+          Text('Type: ${isExpense ? 'Expense' : 'Sold'}'),
+          Text('Date: ${dateFormat.format(tx.addedAt)}'),
         ],
       ),
-    );
-  }
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+      ],
+    ),
+  );
+}
+
 
   void _showDataSheet<T>(
     BuildContext context,
@@ -485,6 +487,53 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
       ),
     );
   }
+Future<List<TransactionEntry>> _fetchAllTransactions() async {
+  final range = _getSelectedRange();
+
+  // Fetch expenses
+  final expenseSnap = await FirebaseFirestore.instance
+      .collection('expenses')
+      .where('addedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
+      .where('addedAt', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
+      .get();
+
+  final expenses = expenseSnap.docs.map((doc) {
+    final d = doc.data();
+    return TransactionEntry(
+      id: doc.id,
+      type: 'expense',
+      description: d['description'] ?? '',
+      amount: (d['amount'] ?? 0).toDouble(),
+      addedAt: (d['addedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  });
+
+  // Fetch orders
+  final orderSnap = await FirebaseFirestore.instance
+      .collection('orders')
+      .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
+      .where('orderTime', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
+      .get();
+
+  final orders = orderSnap.docs.map((doc) {
+    final d = doc.data();
+    return TransactionEntry(
+      id: doc.id,
+      type: 'sold',
+      description: d['customerName'] ?? 'Unknown',
+      amount: (d['totalAmount'] ?? 0).toDouble(),
+      addedAt: (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      itemType: d['itemType'] ?? 'Unknown',
+    );
+  });
+
+  // Merge & sort
+  final allTransactions = [...expenses, ...orders].toList()
+    ..sort((a, b) => b.addedAt.compareTo(a.addedAt)); // latest first
+
+  return allTransactions;
+}
+
 
 Future<List<Map<String, dynamic>>> _fetchOrdersForPeriod() async {
   final range = _getSelectedRange();
@@ -502,6 +551,7 @@ Future<List<Map<String, dynamic>>> _fetchOrdersForPeriod() async {
       'totalSold': (d['totalAmount'] as num?)?.toDouble() ?? 0.0,
       'customerName': d['customerName'] ?? 'Unknown',
       'orderTime': (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      'itemType': d['itemType'] ?? 'Unknown',
     };
   }).toList();
 

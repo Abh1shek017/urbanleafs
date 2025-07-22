@@ -8,6 +8,7 @@ class OrderModel {
   final String customerName;
   final DateTime orderTime;
   final String addedBy;
+  final String itemType; 
 
   OrderModel({
     required this.id,
@@ -17,6 +18,7 @@ class OrderModel {
     required this.customerName,
     required this.orderTime,
     required this.addedBy,
+    required this.itemType,
   });
 
   factory OrderModel.fromSnapshot(DocumentSnapshot snapshot) {
@@ -34,6 +36,7 @@ class OrderModel {
           ? (data!['orderTime'] as Timestamp).toDate()
           : DateTime.now(),
       addedBy: data?['addedBy'] ?? 'Unknown',
+      itemType: data?['itemType'] ?? 'Unknown',
     );
   }
 

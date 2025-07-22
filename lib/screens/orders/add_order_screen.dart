@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/master_data_service.dart';
-// import '../../viewmodels/order_viewmodel.dart';
 import '../../utils/notifications_util.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -206,7 +205,7 @@ String _generateOrderId(String customer, String itemType) {
     final docId = _generateOrderId(_selectedCustomer!, _selectedItem!);
 
     final orderData = {
-      'description': _selectedItem,
+      'itemType': _selectedItem,
       'quantity': _quantity,
       'totalAmount': _total,
       'customerName': _selectedCustomer,
