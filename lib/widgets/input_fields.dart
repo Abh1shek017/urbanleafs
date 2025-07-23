@@ -5,6 +5,7 @@ class GreenInputField extends StatelessWidget {
   final IconData icon;
   final String? Function(String?)? validator;
   final void Function(String?)? onSaved;
+  final TextEditingController? controller; // ✅ NEW
   final TextInputType keyboardType;
   final int maxLines;
 
@@ -14,6 +15,7 @@ class GreenInputField extends StatelessWidget {
     required this.icon,
     this.validator,
     this.onSaved,
+    this.controller, // ✅ NEW
     this.keyboardType = TextInputType.text,
     this.maxLines = 1,
   });
@@ -34,6 +36,7 @@ class GreenInputField extends StatelessWidget {
         ],
       ),
       child: TextFormField(
+        controller: controller, // ✅ controller added
         maxLines: maxLines,
         keyboardType: keyboardType,
         decoration: InputDecoration(
