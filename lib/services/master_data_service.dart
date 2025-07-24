@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../models/master_data_model.dart';
 
 class MasterDataService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -11,6 +12,10 @@ class MasterDataService {
     final jsonString = prefs.getString('masterData') ?? '{}';
     return jsonDecode(jsonString);
   }
+Future<MasterDataModel> getMasterDataModel() async {
+  final localJson = await loadLocalMasterData();
+  return MasterDataModel.fromJson(localJson);
+}
 
   /// Updates local SharedPreferences cache
   Future<void> updateLocalMasterData(Map<String, dynamic> data) async {

@@ -6,13 +6,12 @@ import '../models/inventory_model.dart';
 final inventoryRepositoryProvider = Provider<InventoryRepository>(
     (ref) => InventoryRepository());
 
-// Stream of all inventory items
-final allInventoryStreamProvider = StreamProvider.autoDispose<List<InventoryModel>>(
-  (ref) {
-    final repository = ref.watch(inventoryRepositoryProvider);
-    return repository.getAllInventory();
-  },
-);
+// 🔹 Stream of all inventory items (auto-refreshes on any change)
+final allInventoryStreamProvider =
+    StreamProvider.autoDispose<List<InventoryModel>>((ref) {
+  final repository = ref.watch(inventoryRepositoryProvider);
+  return repository.getAllInventory();
+});
 
 // Future to add new inventory item
 final addInventoryItemFutureProvider = FutureProvider.family<void, Map<String, dynamic>>(

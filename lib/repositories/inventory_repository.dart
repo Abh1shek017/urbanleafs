@@ -5,7 +5,7 @@ import 'base_repository.dart';
 
 class InventoryRepository extends BaseRepository {
   InventoryRepository()
-    : super(FirebaseFirestore.instance.collection('inventory'));
+      : super(FirebaseFirestore.instance.collection('inventory'));
 
   /// Stream of all inventory items (real-time)
   Stream<List<InventoryModel>> getAllInventory() {
@@ -30,21 +30,17 @@ class InventoryRepository extends BaseRepository {
     final type = inventoryData['type'] as String? ?? 'raw';
     final quantityToAdd = inventoryData['quantity'] as int? ?? 0;
 
-    final existingQuery = await collection
-        .where('itemName', isEqualTo: itemName)
-        .where('unit', isEqualTo: unit)
-        .where('type', isEqualTo: type)
-        .limit(1)
-        .get();
+    // 🔹 Custom document ID: combine item name, unit, and type
+    final customDocId = '${itemName.trim()}_${unit.trim()}_${type.trim()}';
 
-    if (existingQuery.docs.isNotEmpty) {
+    final existingDoc = await collection.doc(customDocId).get();
+
+    if (existingDoc.exists) {
       // ✅ Item exists, merge quantity
-      final existingDoc = existingQuery.docs.first;
-      final existingData = existingDoc.data() as Map<String, dynamic>;
-
+      final existingData = existingDoc.data() as Map<String, dynamic>? ?? {};
       final newQuantity = (existingData['quantity'] ?? 0) + quantityToAdd;
 
-      await collection.doc(existingDoc.id).update({
+      await collection.doc(customDocId).update({
         'quantity': newQuantity,
         'lastUpdated': inventoryData['lastUpdated'],
         'updatedBy': inventoryData['updatedBy'],
@@ -58,8 +54,8 @@ class InventoryRepository extends BaseRepository {
         'quantity': newQuantity,
       });
     } else {
-      // ✅ Item does not exist, create new
-      await collection.add(inventoryData);
+      // ✅ Item does not exist, create new document with custom ID
+      await collection.doc(customDocId).set(inventoryData);
       await _checkLowStockAndNotify(inventoryData);
     }
   }
@@ -79,8 +75,7 @@ class InventoryRepository extends BaseRepository {
   ) async {
     try {
       final quantity = inventoryData['quantity'] as int? ?? 0;
-      final lowStockThreshold =
-          inventoryData['lowStockThreshold'] as int? ?? 10;
+      final lowStockThreshold = inventoryData['lowStockThreshold'] as int? ?? 10;
       final itemName = inventoryData['itemName'] as String? ?? 'Unknown Item';
       final unit = inventoryData['unit'] as String? ?? 'units';
 
@@ -93,7 +88,6 @@ class InventoryRepository extends BaseRepository {
       }
     } catch (e) {
       // Don't fail inventory update if notification fails
-      // print('Failed to create low inventory notification: $e');
     }
   }
 }
