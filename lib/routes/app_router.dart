@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 // Rest of your imports
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
@@ -111,11 +110,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'todayOrders',
         builder: (context, state) => const TodayOrdersScreen(),
       ),
-      GoRoute(
-        path: '/payments',
-        name: 'todayPayments',
-        builder: (context, state) => const TodayPaymentsScreen(),
-      ),
+    GoRoute(
+  path: '/payments',
+  name: 'todayPayments',
+  builder: (context, state) {
+    return TodayPaymentsScreen();
+  },
+),
+
 
       GoRoute(
         path: '/profile',

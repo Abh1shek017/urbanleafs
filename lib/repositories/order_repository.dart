@@ -1,19 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart'; // For DateUtils
 import '../models/order_model.dart';
-import 'base_repository.dart';
 
-class OrderRepository extends BaseRepository {
-  OrderRepository() : super(FirebaseFirestore.instance.collection('orders'));
+class OrderRepository {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Stream of today's orders (real-time)
+  /// 🔥 Fetch today's orders across all customers
   Stream<List<OrderModel>> getTodaysOrders() {
-    final today = DateUtils.dateOnly(DateTime.now());
-    final tomorrow = today.add(Duration(days: 1));
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
 
-    return collection
-        .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(today))
-        .where('orderTime', isLessThan: Timestamp.fromDate(tomorrow))
+    return _firestore
+        .collectionGroup('orders') // ✅ Searches all subcollections named 'orders'
+        .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
+        .where('orderTime', isLessThan: Timestamp.fromDate(tomorrowStart))
+        .orderBy('orderTime', descending: true)
         .snapshots()
         .map(
           (snapshot) =>
@@ -21,19 +22,32 @@ class OrderRepository extends BaseRepository {
         );
   }
 
-  /// Stream of count of today's orders (real-time)
+  /// 🔥 Count of today's orders
   Stream<int> countTodaysOrders() {
     return getTodaysOrders().map((orders) => orders.length);
   }
 
-  /// Add a new order
-  Future<void> addOrder(Map<String, dynamic> orderData) async {
-    await collection.add(orderData);
-  }
+  /// ✅ Add order to specific customer's subcollection
+Future<void> addOrder({
+  required Map<String, dynamic> orderData,
+  required String orderId,
+}) async {
+  final customerId = orderData['customerId']; // or wherever you store this
+  final docRef = _firestore
+      .collection('customers')
+      .doc(customerId)
+      .collection('orders')
+      .doc(orderId);
 
-  /// ✅ New: Stream of all orders (for Balance Sheet)
+  await docRef.set(orderData);
+}
+
+
+
+  /// 🔥 Fetch all orders across all customers
   Stream<List<OrderModel>> getAllOrders() {
-    return collection
+    return _firestore
+        .collectionGroup('orders') // 🔥 All orders under all customers
         .orderBy('orderTime', descending: true)
         .snapshots()
         .map(

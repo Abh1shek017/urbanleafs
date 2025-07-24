@@ -7,8 +7,6 @@ import '../../utils/format_utils.dart';
 import '../../viewmodels/dashboard_viewmodel.dart';
 import '../../viewmodels/order_viewmodel.dart';
 import '../../providers/inventory_provider.dart';
-// import '../../providers/attendance_provider.dart';          
-import '../../providers/payment_provider.dart';
 import '../../providers/expense_provider.dart';
 import '../attendance/attendance_screen.dart';
 import '../attendance/daily_attendance_screen.dart';
@@ -19,6 +17,7 @@ import '../orders/today_orders_screen.dart';
 import '../payments/today_payments_screen.dart';
 import '../expense/today_expense_screen.dart';
 import '../../providers/user_provider.dart';
+import '../../viewmodels/payment_viewmodel.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -79,9 +78,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   ) {
     final inventoryAsync = ref.watch(inventoryStreamProvider);
     final todaysOrderCount = ref.watch(todaysOrderCountStreamProvider);
-    final todaysEarnings = ref.watch(todaysPaymentsStreamProvider);
+    final todaysEarnings = ref.watch(allTodaysPaymentsProvider);
     final todaysExpenses = ref.watch(todaysExpensesStreamProvider);
-
 
     return Scaffold(
       appBar: const CustomAppBar(title: "UrbanLeafs"),
@@ -141,32 +139,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     error: (_, __) => "Error",
                   ),
                 ),
-                _buildQuickAccessCard(
-                  context,
-                  Icons.attach_money,
-                  "Today's Payments",
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const TodayPaymentsScreen(),
-                    ),
-                  ),
-                  subtitle: todaysEarnings.when(
-                    data: (earningData) {
-                      final total = earningData.fold<double>(
-                        0,
-                        (sum, p) => sum + (p.amount),
-                      );
-                      final customerCount = earningData
-                          .map((p) => p.customerName)
-                          .toSet()
-                          .length;
-                      return "${FormatUtils.formatCurrency(total)}\nFrom $customerCount customers";
-                    },
-                    loading: () => "Loading...",
-                    error: (_, __) => "Error",
-                  ),
-                ),
+               _buildQuickAccessCard(
+  context,
+  Icons.attach_money,
+  "Today's Payments",
+  () => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => TodayPaymentsScreen(),
+    ),
+  ),
+  subtitle: todaysEarnings.when(
+    data: (earningData) {
+      final total = earningData.fold<double>(
+        0,
+        (sum, p) => sum + (p.amount),
+      );
+      final customerCount = earningData
+          .map((p) => p.customerName)
+          .toSet()
+          .length;
+      return "${FormatUtils.formatCurrency(total)}\nFrom $customerCount customers";
+    },
+    loading: () => "Loading...",
+    error: (_, __) => "Error",
+  ),
+),
+
                 inventoryAsync.when(
                   loading: () => const SizedBox(),
                   error: (_, __) => const SizedBox(),
@@ -231,7 +230,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     BuildContext context,
     IconData icon,
     String title,
-    VoidCallback onTap, {
+    VoidCallback? onTap, {
     String? subtitle,
   }) {
     return Padding(

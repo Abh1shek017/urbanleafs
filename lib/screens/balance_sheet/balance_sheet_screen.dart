@@ -487,7 +487,7 @@ void _showTransactionDetail(BuildContext context, TransactionEntry tx) {
       ),
     );
   }
-Future<List<TransactionEntry>> _fetchAllTransactions() async {
+Future<List<TransactionEntry>> fetchAllTransactions() async {
   final range = _getSelectedRange();
 
   // Fetch expenses
@@ -631,25 +631,9 @@ Future<double> _calculateTotalSold() async {
     final end = DateTime(selectedYear, monthIndex + 1, 0, 23, 59, 59);
     return customRange ?? DateTimeRange(start: start, end: end);
   }
-
 void _showTotalSoldDetails(BuildContext context) async {
   final orders = await _fetchOrdersForPeriod();
 
-  double totalSold = 0.0;
-
-  for (final order in orders) {
-    final rawAmount = order['totalSold'] ?? order['totalAmount'];
-
-    if (rawAmount is int) {
-      totalSold += rawAmount.toDouble();
-    } else if (rawAmount is double) {
-      totalSold += rawAmount;
-    } else if (rawAmount is String) {
-      totalSold += double.tryParse(rawAmount) ?? 0.0;
-    } else {
-      print('❌ Unknown amount type: $rawAmount');
-    }
-  }
   if (context.mounted) {
     _showDataSheet(
       context,
@@ -665,8 +649,6 @@ void _showTotalSoldDetails(BuildContext context) async {
           amount = rawAmount;
         } else if (rawAmount is String) {
           amount = double.tryParse(rawAmount) ?? 0.0;
-        } else {
-          amount = 0.0;
         }
 
         final customer = order['customerName']?.toString() ?? 'Unknown';

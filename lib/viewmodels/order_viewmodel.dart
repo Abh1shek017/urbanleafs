@@ -22,6 +22,13 @@ final todaysOrderCountStreamProvider = StreamProvider<int>((ref) {
 final addOrderFutureProvider = FutureProvider.family<void, Map<String, dynamic>>(
   (ref, orderData) async {
     final repository = ref.watch(orderRepositoryProvider);
-    await repository.addOrder(orderData);
+
+    final orderId = 'order_${DateTime.now().millisecondsSinceEpoch}';
+    orderData['id'] = orderId;
+
+    await repository.addOrder(
+      orderData: orderData,
+      orderId: orderId,
+    );
   },
 );

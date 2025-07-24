@@ -1,18 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart'; // Needed for DateUtils
+import 'package:flutter/material.dart';
 import '../models/payment_model.dart';
-import 'base_repository.dart';
 
-class PaymentRepository extends BaseRepository {
-  PaymentRepository()
-    : super(FirebaseFirestore.instance.collection('payments'));
+class PaymentRepository {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Stream of today's payments (real-time)
-  Stream<List<PaymentModel>> getTodaysPayments() {
+  /// Stream of today's payments for a customer
+  Stream<List<PaymentModel>> getTodaysPayments(String customerId) {
     final today = DateUtils.dateOnly(DateTime.now());
     final tomorrow = today.add(Duration(days: 1));
 
-    return collection
+    return _firestore
+        .collection('customers')
+        .doc(customerId)
+        .collection('payments')
         .where(
           'receivedTime',
           isGreaterThanOrEqualTo: Timestamp.fromDate(today),
@@ -26,16 +27,31 @@ class PaymentRepository extends BaseRepository {
         );
   }
 
-  /// Stream of total earnings today (real-time)
-  Stream<double> totalTodaysEarnings() {
-    return getTodaysPayments().map(
+  /// Stream of total earnings today for a customer
+  Stream<double> totalTodaysEarnings(String customerId) {
+    return getTodaysPayments(customerId).map(
       (payments) =>
           payments.fold(0.0, (total, payment) => total + payment.amount),
     );
   }
+  String _twoDigits(int n) => n.toString().padLeft(2, '0');
+
 
   /// Add new payment
-  Future<void> addPayment(Map<String, dynamic> paymentData) async {
-    await collection.add(paymentData);
-  }
+Future<void> addPayment(String customerId, PaymentModel payment) async {
+  final now = DateTime.now();
+final formattedDate = '${now.year}${_twoDigits(now.month)}${_twoDigits(now.day)}_${_twoDigits(now.hour)}${_twoDigits(now.minute)}${_twoDigits(now.second)}';
+final paymentId = '${payment.amount.toStringAsFixed(0)}_payment_$formattedDate';
+
+
+  final docRef = _firestore
+      .collection('customers')
+      .doc(customerId)
+      .collection('payments')
+      .doc(paymentId);
+
+  await docRef.set(
+    payment.copyWith(id: paymentId).toJson(),
+  );
+}
 }

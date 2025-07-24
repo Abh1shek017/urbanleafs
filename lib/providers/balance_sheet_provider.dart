@@ -7,15 +7,20 @@ import '../repositories/order_repository.dart';
 import '../providers/order_provider.dart';
 import 'package:flutter/material.dart'; // for DateTimeRange
 
-final balanceSheetProvider = StateNotifierProvider<BalanceSheetNotifier, BalanceSheetState>(
-  (ref) => BalanceSheetNotifier(ref.read(orderRepositoryProvider), FirebaseFirestore.instance),
-);
+final balanceSheetProvider =
+    StateNotifierProvider<BalanceSheetNotifier, BalanceSheetState>(
+      (ref) => BalanceSheetNotifier(
+        ref.read(orderRepositoryProvider),
+        FirebaseFirestore.instance,
+      ),
+    );
 
 class BalanceSheetNotifier extends StateNotifier<BalanceSheetState> {
   final OrderRepository orderRepo;
   final FirebaseFirestore firestore;
 
-  BalanceSheetNotifier(this.orderRepo, this.firestore) : super(BalanceSheetState()) {
+  BalanceSheetNotifier(this.orderRepo, this.firestore)
+    : super(BalanceSheetState()) {
     loadData(); // Load initial data
   }
 
@@ -24,7 +29,7 @@ class BalanceSheetNotifier extends StateNotifier<BalanceSheetState> {
       state = state.copyWith(isLoading: true);
 
       // 🔸 Load and filter orders
-      Query orderQuery = orderRepo.collection;
+      Query orderQuery = firestore.collectionGroup('orders');
       if (range != null) {
         orderQuery = orderQuery
             .where('orderTime', isGreaterThanOrEqualTo: range.start)
@@ -32,7 +37,9 @@ class BalanceSheetNotifier extends StateNotifier<BalanceSheetState> {
       }
 
       final orderSnap = await orderQuery.get();
-      final orderModels = orderSnap.docs.map((doc) => OrderModel.fromSnapshot(doc)).toList();
+      final orderModels = orderSnap.docs
+          .map((doc) => OrderModel.fromSnapshot(doc))
+          .toList();
 
       double totalSold = 0.0;
       double dueAmounts = 0.0;
@@ -74,7 +81,8 @@ class BalanceSheetNotifier extends StateNotifier<BalanceSheetState> {
         final data = doc.data() as Map<String, dynamic>? ?? {};
         final amt = (data['amount'] ?? 0).toDouble();
         final type = data['type']?.toString().toLowerCase() ?? 'general';
-        final addedAt = (data['addedAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+        final addedAt =
+            (data['addedAt'] as Timestamp?)?.toDate() ?? DateTime.now();
         final description = data['description']?.toString() ?? 'No Description';
 
         final entry = TransactionEntry(
@@ -113,10 +121,7 @@ class BalanceSheetNotifier extends StateNotifier<BalanceSheetState> {
         dueCustomerCount: dueCustomerCount,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 }
