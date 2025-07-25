@@ -148,7 +148,7 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
       // Clean up values for ID
       final formattedDate =
           '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-      final cleanedCustomerName = customerName!.replaceAll(' ', '');
+      final cleanedCustomerName = (customerName ?? '').replaceAll(' ', '');
       final paymentId =
           '${_paymentStatus}_${_amountPaid.toInt()}_${cleanedCustomerName}_$formattedDate';
 
@@ -216,7 +216,8 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
                             (c) => DropdownMenuItem(value: c, child: Text(c)),
                           )
                           .toList(),
-                      onChanged: (val) => setState(() => _selectedCustomer),
+                      onChanged: (val) =>
+                          setState(() => _selectedCustomer = val),
                       validator: (val) =>
                           val == null ? 'Select a customer' : null,
                     ),
@@ -302,8 +303,9 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
                             },
                             validator: (val) {
                               final price = double.tryParse(val ?? '');
-                              if (price == null || price < 0)
-                                return 'Invalid price';
+                              if (price == null || price <= 0) {
+                                return 'Price must be greater than 0';
+                              }
                               return null;
                             },
                           ),

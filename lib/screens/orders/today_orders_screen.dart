@@ -53,6 +53,11 @@ class TodayOrdersScreen extends ConsumerWidget {
                         .toDouble(); // ✅ Safe cast
 
                     return Card(
+                      color: amountPaid >= amount
+                          ? Colors.green[100]
+                          : (amountPaid > 0
+                                ? Colors.orange[100]
+                                : Colors.red[100]),
                       margin: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
@@ -78,7 +83,7 @@ class TodayOrdersScreen extends ConsumerWidget {
                             Text("Qty: ${order.quantity}"),
                             Text(
                               "Amount: ₹${amount.toStringAsFixed(2)} | Paid: ₹${amountPaid.toStringAsFixed(2)}",
-                            ), // ✅ Safe usage
+                            ),
                             Text(
                               "Time: $formattedDate",
                               style: const TextStyle(color: Colors.grey),
