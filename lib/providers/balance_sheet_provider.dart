@@ -57,7 +57,6 @@ class BalanceSheetNotifier extends StateNotifier<BalanceSheetState> {
           description: order.customerName,
           amount: order.totalAmount,
           addedAt: order.orderTime,
-          itemType: order.itemType,
         );
       }).toList();
 

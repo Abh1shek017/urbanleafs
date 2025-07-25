@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:urbanleafs/providers/current_user_stream_provider.dart';
+import 'package:intl/intl.dart';
 
-class AddOrderCard extends StatefulWidget {
+class AddOrderCard extends ConsumerStatefulWidget {
   const AddOrderCard({super.key});
 
   @override
-  State<AddOrderCard> createState() => _AddOrderCardState();
+  ConsumerState<AddOrderCard> createState() => _AddOrderCardState();
 }
 
-class _AddOrderCardState extends State<AddOrderCard> {
+class _AddOrderCardState extends ConsumerState<AddOrderCard> {
   final _formKey = GlobalKey<FormState>();
 
   List<String> _customerList = [];
@@ -17,12 +20,15 @@ class _AddOrderCardState extends State<AddOrderCard> {
   String? _selectedCustomer;
   Map<String, dynamic>? _selectedItem;
 
+  String sanitize(String input) {
+    return input.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+  }
+
   int _quantity = 1;
   double _price = 0.0;
   double _amountPaid = 0.0;
   double _totalAmount = 0.0;
   String _paymentStatus = 'Unpaid';
-
   bool _loading = false;
 
   final TextEditingController _priceController = TextEditingController();
@@ -36,9 +42,13 @@ class _AddOrderCardState extends State<AddOrderCard> {
   }
 
   Future<void> _fetchCustomers() async {
-    final snapshot = await FirebaseFirestore.instance.collection('customers').get();
+    final snapshot = await FirebaseFirestore.instance
+        .collection('customers')
+        .get();
     setState(() {
-      _customerList = snapshot.docs.map((doc) => doc['name'] as String).toList();
+      _customerList = snapshot.docs
+          .map((doc) => doc['name'] as String)
+          .toList();
     });
   }
 
@@ -50,12 +60,14 @@ class _AddOrderCardState extends State<AddOrderCard> {
 
     setState(() {
       _itemList = snapshot.docs
-          .map((doc) => {
-                'id': doc.id,
-                'name': doc['name'],
-                'quantity': doc['quantity'],
-                'price': doc['price'],
-              })
+          .map(
+            (doc) => {
+              'id': doc.id,
+              'name': doc['itemName'],
+              'quantity': doc['quantity'],
+              // 'price': doc['price'],
+            },
+          )
           .toList();
     });
   }
@@ -85,7 +97,7 @@ class _AddOrderCardState extends State<AddOrderCard> {
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate() || !_isOrderValid) return;
 
-    final customerName = _selectedCustomer!;
+    final customerName = _selectedCustomer;
     final itemName = _selectedItem!['name'];
     final itemId = _selectedItem!['id'];
 
@@ -107,31 +119,53 @@ class _AddOrderCardState extends State<AddOrderCard> {
 
       // Generate order ID
       final now = DateTime.now();
-      final orderId = '${itemName}_${customerName}_${now.millisecondsSinceEpoch}';
+      final orderId =
+          '${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}_${sanitize(_selectedCustomer!)}_${sanitize(itemName)}';
 
-      // Add order
+      final userAsync = ref.read(currentUserStreamProvider);
+      String _addedBy = 'Unknown';
+
+      userAsync.when(
+        data: (user) => _addedBy = user?.username ?? 'Unknown',
+        loading: () => _addedBy = 'Loading...',
+        error: (_, __) => _addedBy = 'Unknown',
+      );
+
       await customerDoc.collection('orders').doc(orderId).set({
         'item': itemName,
         'quantity': _quantity,
         'price': _price,
         'totalAmount': _totalAmount,
-        'timestamp': now,
+        'orderTime': now,
         'paymentStatus': _paymentStatus,
+        'addedBy': _addedBy,
+        'customerName': _selectedCustomer,
+        'amountPaid': _amountPaid,
       });
 
       // Add payment
-      await customerDoc.collection('payments').add({
-        'amount': _amountPaid,
+
+      // Clean up values for ID
+      final formattedDate =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      final cleanedCustomerName = customerName!.replaceAll(' ', '');
+      final paymentId =
+          '${_paymentStatus}_${_amountPaid.toInt()}_${cleanedCustomerName}_$formattedDate';
+
+      await customerDoc.collection('payments').doc(paymentId).set({
+        'amountPaid': _amountPaid,
         'status': _paymentStatus,
         'timestamp': now,
+        'totalAmount': _totalAmount,
         'note': 'Auto-payment for order $orderId',
       });
 
       // Deduct inventory quantity
       final newQty = (_selectedItem!['quantity'] as int) - _quantity;
-      await FirebaseFirestore.instance.collection('inventory').doc(itemId).update({
-        'quantity': newQty,
-      });
+      await FirebaseFirestore.instance
+          .collection('inventory')
+          .doc(itemId)
+          .update({'quantity': newQty});
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order placed successfully!')),
@@ -151,9 +185,9 @@ class _AddOrderCardState extends State<AddOrderCard> {
 
       _fetchPreparedItems();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
 
     setState(() => _loading = false);
@@ -178,10 +212,13 @@ class _AddOrderCardState extends State<AddOrderCard> {
                       value: _selectedCustomer,
                       decoration: const InputDecoration(labelText: 'Customer'),
                       items: _customerList
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                          .map(
+                            (c) => DropdownMenuItem(value: c, child: Text(c)),
+                          )
                           .toList(),
-                      onChanged: (val) => setState(() => _selectedCustomer = val),
-                      validator: (val) => val == null ? 'Select a customer' : null,
+                      onChanged: (val) => setState(() => _selectedCustomer),
+                      validator: (val) =>
+                          val == null ? 'Select a customer' : null,
                     ),
 
                     const SizedBox(height: 16),
@@ -189,12 +226,18 @@ class _AddOrderCardState extends State<AddOrderCard> {
                     /// 2. Item Dropdown with quantity
                     DropdownButtonFormField<Map<String, dynamic>>(
                       value: _selectedItem,
-                      decoration: const InputDecoration(labelText: 'Item (Available)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Item (Available)',
+                      ),
                       items: _itemList
-                          .map((item) => DropdownMenuItem(
-                                value: item,
-                                child: Text('${item['name']} (Qty: ${item['quantity']})'),
-                              ))
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item,
+                              child: Text(
+                                '${item['name']} (Qty: ${item['quantity']})',
+                              ),
+                            ),
+                          )
                           .toList(),
                       onChanged: (val) {
                         setState(() {
@@ -216,7 +259,9 @@ class _AddOrderCardState extends State<AddOrderCard> {
                         Expanded(
                           child: TextFormField(
                             initialValue: '1',
-                            decoration: const InputDecoration(labelText: 'Quantity'),
+                            decoration: const InputDecoration(
+                              labelText: 'Quantity',
+                            ),
                             keyboardType: TextInputType.number,
                             onChanged: (val) {
                               _quantity = int.tryParse(val) ?? 1;
@@ -226,7 +271,8 @@ class _AddOrderCardState extends State<AddOrderCard> {
                             },
                             validator: (val) {
                               final qty = int.tryParse(val ?? '');
-                              if (qty == null || qty <= 0) return 'Invalid quantity';
+                              if (qty == null || qty <= 0)
+                                return 'Invalid quantity';
                               if (!_isOrderValid) return 'Exceeds stock';
                               return null;
                             },
@@ -236,16 +282,28 @@ class _AddOrderCardState extends State<AddOrderCard> {
                         Expanded(
                           child: TextFormField(
                             controller: _priceController,
-                            decoration: const InputDecoration(labelText: 'Price per item'),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Price per item',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             onChanged: (val) {
                               _price = double.tryParse(val) ?? 0.0;
                               _calculateTotalAmount();
                               _updatePaymentStatus();
                             },
+                            onTap: () {
+                              // Auto-select the entire text when tapped
+                              _priceController.selection = TextSelection(
+                                baseOffset: 0,
+                                extentOffset: _priceController.text.length,
+                              );
+                            },
                             validator: (val) {
                               final price = double.tryParse(val ?? '');
-                              if (price == null || price < 0) return 'Invalid price';
+                              if (price == null || price < 0)
+                                return 'Invalid price';
                               return null;
                             },
                           ),
@@ -266,15 +324,21 @@ class _AddOrderCardState extends State<AddOrderCard> {
                               filled: true,
                               fillColor: Colors.grey.shade200,
                             ),
-                            controller: TextEditingController(text: _totalAmount.toStringAsFixed(2)),
+                            controller: TextEditingController(
+                              text: _totalAmount.toStringAsFixed(2),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextFormField(
                             controller: _amountPaidController,
-                            decoration: const InputDecoration(labelText: 'Amount Paid'),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Amount Paid',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             onChanged: (val) {
                               _amountPaid = double.tryParse(val) ?? 0.0;
                               _updatePaymentStatus();
@@ -298,7 +362,9 @@ class _AddOrderCardState extends State<AddOrderCard> {
                               filled: true,
                               fillColor: Colors.grey.shade200,
                             ),
-                            controller: TextEditingController(text: _paymentStatus),
+                            controller: TextEditingController(
+                              text: _paymentStatus,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),

@@ -11,8 +11,13 @@ class OrderRepository {
     final tomorrowStart = todayStart.add(const Duration(days: 1));
 
     return _firestore
-        .collectionGroup('orders') // ✅ Searches all subcollections named 'orders'
-        .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
+        .collectionGroup(
+          'orders',
+        ) // ✅ Searches all subcollections named 'orders'
+        .where(
+          'orderTime',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart),
+        )
         .where('orderTime', isLessThan: Timestamp.fromDate(tomorrowStart))
         .orderBy('orderTime', descending: true)
         .snapshots()
@@ -28,21 +33,19 @@ class OrderRepository {
   }
 
   /// ✅ Add order to specific customer's subcollection
-Future<void> addOrder({
-  required Map<String, dynamic> orderData,
-  required String orderId,
-}) async {
-  final customerId = orderData['customerId']; // or wherever you store this
-  final docRef = _firestore
-      .collection('customers')
-      .doc(customerId)
-      .collection('orders')
-      .doc(orderId);
+  Future<void> addOrder({
+    required Map<String, dynamic> orderData,
+    required String orderId,
+  }) async {
+    final customerId = orderData['customerId']; // or wherever you store this
+    final docRef = _firestore
+        .collection('customers')
+        .doc(customerId)
+        .collection('orders')
+        .doc(orderId);
 
-  await docRef.set(orderData);
-}
-
-
+    await docRef.set(orderData);
+  }
 
   /// 🔥 Fetch all orders across all customers
   Stream<List<OrderModel>> getAllOrders() {

@@ -51,7 +51,6 @@ import '../screens/settings_menu/settings_menu_screen.dart';
 // Master Data
 import '../screens/master_data/manage_customers_screen.dart';
 import '../screens/master_data/manage_inventory_screen.dart';
-import '../screens/master_data/manage_orders_screen.dart';
 import '../screens/master_data/manage_expenses_screen.dart';
 
 // Activity
@@ -254,11 +253,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/master-data/inventory',
         name: 'manage_inventory',
         builder: (context, state) => const ManageInventoryScreen(),
-      ),
-      GoRoute(
-        path: '/master-data/orders',
-        name: 'manage_orders',
-        builder: (context, state) => const ManageOrdersScreen(),
       ),
       GoRoute(
         path: '/master-data/expenses',

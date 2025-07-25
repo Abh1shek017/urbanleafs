@@ -22,10 +22,11 @@ class TodayOrdersScreen extends ConsumerWidget {
             ),
             ordersAsync.when(
               loading: () => const Center(
-                    child: Padding(
+                child: Padding(
                   padding: EdgeInsets.all(20.0),
                   child: CircularProgressIndicator(),
-                )),
+                ),
+              ),
               error: (err, stack) => Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Center(child: Text('Error: $err')),
@@ -44,11 +45,18 @@ class TodayOrdersScreen extends ConsumerWidget {
                   itemCount: orders.length,
                   itemBuilder: (context, index) {
                     final order = orders[index];
-                    final formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(order.orderTime);
-                    final amount = (order.totalAmount).toDouble(); // ✅ Safe cast
+                    final formattedDate = DateFormat(
+                      'dd MMM yyyy, hh:mm a',
+                    ).format(order.orderTime);
+                    final amount = (order.totalAmount).toDouble();
+                    final amountPaid = (order.amountPaid)
+                        .toDouble(); // ✅ Safe cast
 
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -58,15 +66,23 @@ class TodayOrdersScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(order.customerName,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text(
+                              order.customerName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text("Item: ${order.description}"),
+                            Text("Item: ${order.item}"),
                             Text("Qty: ${order.quantity}"),
-                            Text("Price: ₹${amount.toStringAsFixed(2)}"), // ✅ Safe usage
-                            Text("Time: $formattedDate",
-                                style: const TextStyle(color: Colors.grey)),
+                            Text(
+                              "Amount: ₹${amount.toStringAsFixed(2)} | Paid: ₹${amountPaid.toStringAsFixed(2)}",
+                            ), // ✅ Safe usage
+                            Text(
+                              "Time: $formattedDate",
+                              style: const TextStyle(color: Colors.grey),
+                            ),
                           ],
                         ),
                       ),

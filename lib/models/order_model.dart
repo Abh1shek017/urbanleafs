@@ -2,29 +2,27 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class OrderModel {
   final String id;
-  final String description;
+  final String item;
   final int quantity;
+  final double price;
   final double totalAmount;
-  final double pricePerItem;
   final double amountPaid;
   final String paymentStatus;
   final String customerName;
   final DateTime orderTime;
   final String addedBy;
-  final String itemType;
 
   OrderModel({
     required this.id,
-    required this.description,
+    required this.item,
     required this.quantity,
+    required this.price,
     required this.totalAmount,
-    required this.pricePerItem,
     required this.amountPaid,
     required this.paymentStatus,
     required this.customerName,
     required this.orderTime,
     required this.addedBy,
-    required this.itemType,
   });
 
   factory OrderModel.fromSnapshot(DocumentSnapshot snapshot) {
@@ -32,13 +30,11 @@ class OrderModel {
 
     return OrderModel(
       id: snapshot.id,
-      description: data?['description'] ?? 'Unknown Item',
+      item: data?['item'] ?? 'Unknown Item',
       quantity: (data?['quantity'] ?? 0) as int,
+      price: (data?['price'] is num) ? (data!['price'] as num).toDouble() : 0.0,
       totalAmount: (data?['totalAmount'] is num)
           ? (data!['totalAmount'] as num).toDouble()
-          : 0.0,
-      pricePerItem: (data?['pricePerItem'] is num)
-          ? (data!['pricePerItem'] as num).toDouble()
           : 0.0,
       amountPaid: (data?['amountPaid'] is num)
           ? (data!['amountPaid'] as num).toDouble()
@@ -49,22 +45,20 @@ class OrderModel {
           ? (data!['orderTime'] as Timestamp).toDate()
           : DateTime.now(),
       addedBy: data?['addedBy'] ?? 'Unknown',
-      itemType: data?['itemType'] ?? 'Unknown',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'description': description,
+      'item': item,
       'quantity': quantity,
+      'price': price,
       'totalAmount': totalAmount,
-      'pricePerItem': pricePerItem,
       'amountPaid': amountPaid,
       'paymentStatus': paymentStatus,
       'customerName': customerName,
       'orderTime': orderTime,
       'addedBy': addedBy,
-      'itemType': itemType,
     };
   }
 }
