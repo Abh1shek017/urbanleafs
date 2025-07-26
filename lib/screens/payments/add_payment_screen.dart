@@ -6,16 +6,18 @@ import '../../constants/app_constants.dart';
 // import '../../utils/notifications_util.dart';
 import '../../viewmodels/payment_viewmodel.dart';
 import '../../models/payment_model.dart';
+// import '../../repositories/customer_repository.dart';
+import '../../providers/customer_provider.dart';
 
 class CustomerEntry {
   final String id;
   final String name;
-  final double dueAmount;
+  // final double dueAmount;
 
-  CustomerEntry({
-    required this.id,
-    required this.name,
-    required this.dueAmount,
+
+  CustomerEntry({required this.id, 
+  required this.name,
+  // this.dueAmount = 0.0,
   });
 }
 
@@ -44,6 +46,36 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
     _loadCustomers();
   }
 
+  void debugIndex(BuildContext context) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+      final snapshot = await firestore
+          .collectionGroup('payments')
+          .where(
+            'receivedTime',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+          )
+          .where(
+            'receivedTime',
+            isLessThanOrEqualTo: Timestamp.fromDate(endOfDay),
+          )
+          .orderBy('receivedTime', descending: true)
+          .limit(1)
+          .get();
+
+      debugPrint("Index working. Docs found: ${snapshot.docs.length}");
+    } catch (e) {
+      debugPrint("🔥 Index error: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Firestore error: $e")));
+    }
+  }
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -51,38 +83,38 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
   }
 
   Future<void> _loadCustomers() async {
-    try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('customers').get();
+  try {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('customers')
+        .get();
 
-      final List<CustomerEntry> customers = [];
+    final List<CustomerEntry> customers = [];
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final name = data['name'] ?? 'Unnamed';
-        final totalDue = (data['dueAmount'] ?? 0).toDouble();
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final name = data['name'] ?? 'Unnamed';
+      final id = doc.id;
 
-        customers.add(CustomerEntry(
-          id: doc.id,
-          name: name,
-          dueAmount: totalDue,
-        ));
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _customerList = customers;
-        _loading = false;
-        _error = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = e.toString();
-      });
+      customers.add(
+        CustomerEntry(id: id, name: name), // dueAmount will be loaded by provider
+      );
     }
+
+    if (!mounted) return;
+    setState(() {
+      _customerList = customers;
+      _loading = false;
+      _error = null;
+    });
+  } catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _error = e.toString();
+    });
   }
+}
+
 
   void _submitPayment() async {
     if (_formKey.currentState!.validate()) {
@@ -103,39 +135,37 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
       }
 
       try {
-       // Inside your onPressed or submit handler:
+        // Inside your onPressed or submit handler:
 
-// 1) Build the PaymentModel
-final payment = PaymentModel(
-  id: '', // will be set in the repo
-  amount: amount,
-  customerName: _selectedCustomer!.name,
-  receivedTime: DateTime.now(),
-  receivedBy: widget.userId,
-  type: _paymentType,
-  customerId: _selectedCustomer!.id,
-  paymentId: '', // will be set in the repo
-);
+        // 1) Build the PaymentModel
+        final payment = PaymentModel(
+          id: '', // will be set in the repo
+          amount: amount,
+          customerName: _selectedCustomer!.name,
+          receivedTime: DateTime.now(),
+          receivedBy: widget.userId,
+          type: _paymentType,
+          customerId: _selectedCustomer!.id,
+          paymentId: '', // will be set in the repo
+        );
 
-final addPaymentProvider = FutureProvider.family<void, PaymentModel>(
-  (ref, payment) async {
-    final repo = ref.watch(paymentRepositoryProvider(payment.customerId));
-    await repo.addPayment(payment.customerId, payment);
-    setState(() {
-  _amountController.clear();
-  _selectedCustomer = null;
-  _selectedCustomerId = null;
-  _paymentType = AppConstants.paymentCash;
-});
+        final addPaymentProvider = FutureProvider.family<void, PaymentModel>((
+          ref,
+          payment,
+        ) async {
+          final repo = ref.watch(paymentRepositoryProvider(payment.customerId));
+          await repo.addPayment(payment.customerId, payment);
+          setState(() {
+            _amountController.clear();
+            _selectedCustomer = null;
+            _selectedCustomerId = null;
+            _paymentType = AppConstants.paymentCash;
+          });
+        });
 
-  },
-);
-
-// 2) Call the provider
-await ref.read(addPaymentProvider(payment).future); // ✅ correct
-// Note the () to execute the function
-
-
+        // 2) Call the provider
+        await ref.read(addPaymentProvider(payment).future); // ✅ correct
+        // Note the () to execute the function
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Payment added successfully')),
@@ -143,9 +173,9 @@ await ref.read(addPaymentProvider(payment).future); // ✅ correct
         _loadCustomers(); // refresh due after payment
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add payment: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to add payment: $e')));
       }
     }
   }
@@ -167,7 +197,10 @@ await ref.read(addPaymentProvider(payment).future); // ✅ correct
               else if (_error != null)
                 Column(
                   children: [
-                    Text('Error: $_error', style: const TextStyle(color: Colors.red)),
+                    Text(
+                      'Error: $_error',
+                      style: const TextStyle(color: Colors.red),
+                    ),
                     const SizedBox(height: 8),
                     ElevatedButton(
                       onPressed: _loadCustomers,
@@ -179,23 +212,37 @@ await ref.read(addPaymentProvider(payment).future); // ✅ correct
                 const Text('No customers available')
               else
                 DropdownButtonFormField<CustomerEntry>(
-                  value: _selectedCustomer,
-                  hint: const Text("Select Customer"),
-                  items: _customerList
-                      .map(
-                        (entry) => DropdownMenuItem(
-                          value: entry,
-                          child: Text('${entry.name} (₹${entry.dueAmount.toStringAsFixed(2)})'),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (val) => setState(() {
-                    _selectedCustomer = val;
-                    _selectedCustomerId = val?.id;
-                  }),
-                  validator: (val) => val == null ? 'Select a customer' : null,
-                  decoration: const InputDecoration(labelText: 'Customer Name'),
-                ),
+  value: _selectedCustomer,
+  hint: const Text("Select Customer"),
+  onChanged: (val) {
+    setState(() {
+      _selectedCustomer = val;
+      _selectedCustomerId = val?.id;
+    });
+  },
+  validator: (val) => val == null ? 'Select a customer' : null,
+  decoration: const InputDecoration(labelText: 'Customer Name'),
+  items: _customerList.map((entry) {
+    return DropdownMenuItem<CustomerEntry>(
+      value: entry,
+      child: Consumer(
+        builder: (context, ref, _) {
+          final asyncDue = ref.watch(
+            customerDueAmountProvider(entry.id),
+          );
+          return asyncDue.when(
+            data: (due) => Text(
+              '${entry.name} (₹${due.toStringAsFixed(2)})',
+            ),
+            loading: () => Text('${entry.name} (Loading...)'),
+            error: (_, __) => Text('${entry.name} (Err)'),
+          );
+        },
+      ),
+    );
+  }).toList(),
+),
+
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -223,12 +270,15 @@ await ref.read(addPaymentProvider(payment).future); // ✅ correct
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: _paymentType,
-                      items: [AppConstants.paymentCash, AppConstants.paymentOnline]
-                          .map((type) => DropdownMenuItem(
-                                value: type,
-                                child: Text(type),
-                              ))
-                          .toList(),
+                      items:
+                          [AppConstants.paymentCash, AppConstants.paymentOnline]
+                              .map(
+                                (type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(type),
+                                ),
+                              )
+                              .toList(),
                       onChanged: (val) => setState(() {
                         _paymentType = val ?? AppConstants.paymentCash;
                       }),

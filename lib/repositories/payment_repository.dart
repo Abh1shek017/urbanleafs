@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/payment_model.dart';
+import 'package:intl/intl.dart';
 
 class PaymentRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -34,24 +35,30 @@ class PaymentRepository {
           payments.fold(0.0, (total, payment) => total + payment.amount),
     );
   }
-  String _twoDigits(int n) => n.toString().padLeft(2, '0');
-
 
   /// Add new payment
-Future<void> addPayment(String customerId, PaymentModel payment) async {
-  final now = DateTime.now();
-final formattedDate = '${now.year}${_twoDigits(now.month)}${_twoDigits(now.day)}_${_twoDigits(now.hour)}${_twoDigits(now.minute)}${_twoDigits(now.second)}';
-final paymentId = '${payment.amount.toStringAsFixed(0)}_payment_$formattedDate';
+  Future<void> addPayment(String customerId, PaymentModel payment) async {
+    
+    final formattedDate = DateFormat(
+      'yyyyMMdd_HHmmss',
+    ).format(payment.receivedTime);
 
+    // Clean the customer name: remove spaces and lowercase
+    final cleanedCustomerName = payment.customerName
+        .trim()
+        .replaceAll(' ', '')
+        .toLowerCase();
 
-  final docRef = _firestore
-      .collection('customers')
-      .doc(customerId)
-      .collection('payments')
-      .doc(paymentId);
+    // Construct unique payment ID
+    final paymentId =
+        '${formattedDate}_${payment.amount.toStringAsFixed(0)}_${payment.type.toLowerCase()}_${cleanedCustomerName}';
 
-  await docRef.set(
-    payment.copyWith(id: paymentId).toJson(),
-  );
-}
+    final docRef = _firestore
+        .collection('customers')
+        .doc(customerId)
+        .collection('payments')
+        .doc(paymentId);
+
+    await docRef.set(payment.copyWith(id: paymentId).toJson());
+  }
 }

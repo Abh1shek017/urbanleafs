@@ -18,73 +18,71 @@ class PaymentModel {
     required this.receivedBy,
     required this.type,
     required this.customerId,
-    required this.paymentId
+    required this.paymentId,
   });
 
-  /// ✅ Factory for DocumentSnapshot (used when fetching a single doc)
-factory PaymentModel.fromSnapshot(DocumentSnapshot snapshot) {
-  final data = snapshot.data() as Map<String, dynamic>? ?? {};
-  return PaymentModel(
-    id: snapshot.id,
-    amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
-    customerName: data['customerName'] as String? ?? '',
-    receivedTime:
-        (data['receivedTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-    receivedBy: data['receivedBy'] as String? ?? '',
-    type: data['type'] as String? ?? '',
-    customerId: data['customerId'] as String? ?? '',
-    paymentId: data['paymentId'] as String? ?? '', // ✅ added
-  );
-}
+  /// ✅ Factory from Firestore DocumentSnapshot
+  factory PaymentModel.fromSnapshot(DocumentSnapshot snapshot) {
+    final data = snapshot.data() as Map<String, dynamic>? ?? {};
+    return PaymentModel(
+      id: snapshot.id,
+      amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
+      customerName: data['customerName'] as String? ?? '',
+      receivedTime: (data['receivedTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      receivedBy: data['receivedBy'] as String? ?? '',
+      type: data['type'] as String? ?? '',
+      customerId: data['customerId'] as String? ?? '',
+      paymentId: data['paymentId'] as String? ?? '',
+    );
+  }
 
+  /// ✅ Factory from plain Map (used in .map(...) situations)
+  factory PaymentModel.fromMap(Map<String, dynamic> data, String id) {
+    return PaymentModel(
+      id: id,
+      amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
+      customerName: data['customerName'] as String? ?? '',
+      receivedTime: (data['receivedTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      receivedBy: data['receivedBy'] as String? ?? '',
+      type: data['type'] as String? ?? '',
+      customerId: data['customerId'] as String? ?? '',
+      paymentId: data['paymentId'] as String? ?? '',
+    );
+  }
 
-  /// ✅ Factory from plain Map (used with .map(doc => ...))
-factory PaymentModel.fromMap(Map<String, dynamic> data, String id) {
-  return PaymentModel(
-    id: id,
-    amount: (data['amount'] as num?)?.toDouble() ?? 0.0,
-    customerName: data['customerName'] as String? ?? '',
-    receivedTime:
-        (data['receivedTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-    receivedBy: data['receivedBy'] as String? ?? '',
-    type: data['type'] as String? ?? '',
-    customerId: data['customerId'] as String? ?? '',
-    paymentId: data['paymentId'] as String? ?? '', // ✅ added
-  );
-}
-PaymentModel copyWith({
-  String? id,
-  double? amount,
-  String? customerName,
-  DateTime? receivedTime,
-  String? receivedBy,
-  String? type,
-  String? customerId,
-  String? paymentId,
-}) {
-  return PaymentModel(
-    id: id ?? this.id,
-    amount: amount ?? this.amount,
-    customerName: customerName ?? this.customerName,
-    receivedTime: receivedTime ?? this.receivedTime,
-    receivedBy: receivedBy ?? this.receivedBy,
-    type: type ?? this.type,
-    customerId: customerId ?? this.customerId,
-    paymentId: paymentId ?? this.paymentId,
-  );
-}
+  /// ✅ Create a copy with optional overrides
+  PaymentModel copyWith({
+    String? id,
+    double? amount,
+    String? customerName,
+    DateTime? receivedTime,
+    String? receivedBy,
+    String? type,
+    String? customerId,
+    String? paymentId,
+  }) {
+    return PaymentModel(
+      id: id ?? this.id,
+      amount: amount ?? this.amount,
+      customerName: customerName ?? this.customerName,
+      receivedTime: receivedTime ?? this.receivedTime,
+      receivedBy: receivedBy ?? this.receivedBy,
+      type: type ?? this.type,
+      customerId: customerId ?? this.customerId,
+      paymentId: paymentId ?? this.paymentId,
+    );
+  }
 
-
-  /// ✅ Serialize to Firestore format
- Map<String, dynamic> toJson() {
-  return {
-    'amount': amount,
-    'customerName': customerName,
-    'receivedTime': receivedTime,
-    'receivedBy': receivedBy,
-    'type': type,
-    'customerId': customerId,
-    'paymentId': paymentId, // ✅ added
-  };
-}
+  /// ✅ Convert to Firestore JSON format
+  Map<String, dynamic> toJson() {
+    return {
+      'amount': amount,
+      'customerName': customerName,
+      'receivedTime': receivedTime,
+      'receivedBy': receivedBy,
+      'type': type,
+      'customerId': customerId,
+      'paymentId': paymentId,
+    };
+  }
 }

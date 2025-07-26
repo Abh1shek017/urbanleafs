@@ -13,6 +13,10 @@ final updateCustomerProvider = Provider<Future<void> Function(CustomerModel)>((r
   final repo = ref.watch(customerRepoProvider);
   return (CustomerModel customer) => repo.updateCustomer(customer.id, customer.toMap());
 });
+final customerDueAmountProvider = StreamProvider.family<double, String>((ref, customerId) {
+  final repo = ref.read(customerRepoProvider);
+  return repo.watchDueAmount(customerId);
+});
 
 /// 🔹 Holds currently selected customer (can be null initially)
 final selectedCustomerProvider = StateProvider<CustomerModel?>((ref) => null);
