@@ -28,7 +28,7 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
   String? selectedMonthYear;
   String sortOption = 'Latest First';
   String paymentFilter = 'All';
-  final paymentStatusOptions = ['All', 'Paid', 'Unpaid', 'Partial'];
+  final paymentStatusOptions = ['All', 'Paid', 'Unpaid', 'Partially Paid'];
   // List of months for selection
   List<String> monthYearOptions = [];
 
@@ -958,357 +958,351 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     );
   }
 
+  // Helper to safely get DateTime from orderTime
+  DateTime getOrderTime(dynamic orderTime) {
+    if (orderTime is Timestamp) {
+      return orderTime.toDate();
+    } else if (orderTime is DateTime) {
+      return orderTime;
+    } else {
+      return DateTime.now(); // fallback
+    }
+  }
+
   void _showCustomerDetailBottomSheet(BuildContext context, dynamic customer) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        builder: (context, scrollController) {
-          return StatefulBuilder(
-            builder: (context, setState) {
-              String? selectedYear;
-              String? selectedMonth;
+      builder: (_) {
+        return DraggableScrollableSheet(
+          expand: false,
+          builder: (context, scrollController) {
+            // 🔁 These are state variables
+            String? selectedYear;
+            String? selectedMonth;
+            String paymentFilter = 'All';
+            String sortOption = 'Latest First';
 
-              final List<String> yearOptions = ['2024', '2025'];
+            final List<String> yearOptions = ['2024', '2025'];
+            final List<String> monthOptions = [
+              'January',
+              'February',
+              'March',
+              'April',
+              'May',
+              'June',
+              'July',
+              'August',
+              'September',
+              'October',
+              'November',
+              'December',
+            ];
+            final List<String> paymentStatusOptions = [
+              'All',
+              'Paid',
+              'Unpaid',
+              'Partially Paid',
+            ];
 
-              final List<String> monthOptions = [
-                'January',
-                'February',
-                'March',
-                'April',
-                'May',
-                'June',
-                'July',
-                'August',
-                'September',
-                'October',
-                'November',
-                'December',
-              ];
+            List<Map<String, dynamic>> allOrders = [
+              ...customer.allOrders,
+            ]; // <- fix here
+            List<Map<String, dynamic>> filteredOrders = [...allOrders];
 
-              final paymentStatusOptions = ['All', 'Paid', 'Unpaid', 'Partial'];
-              String paymentFilter = 'All';
-              String sortOption = 'Latest First';
+            double totalAmount = 0;
+            double totalPaid = 0;
+            double totalDue = 0;
 
-              List<Map<String, dynamic>> filteredOrders = [
-                ...customer.dueOrders,
-              ];
+            // 🔍 Filters logic
+            void applyFilters() {
+              filteredOrders = [...customer.allOrders];
 
-              void applyFilters() {
-                filteredOrders = [...customer.dueOrders];
-
-                if (selectedYear != null && selectedMonth != null) {
-                  filteredOrders = filteredOrders.where((order) {
-                    final orderDate = (order['orderTime'] as Timestamp)
-                        .toDate();
-                    final monthMatch =
-                        orderDate.month ==
-                        monthOptions.indexOf(selectedMonth!) + 1;
-                    final yearMatch = orderDate.year.toString() == selectedYear;
-                    return monthMatch && yearMatch;
-                  }).toList();
-                }
-
-                if (paymentFilter != 'All') {
-                  filteredOrders = filteredOrders
-                      .where((order) => order['paymentStatus'] == paymentFilter)
-                      .toList();
-                }
-
-                if (sortOption == 'Latest First') {
-                  filteredOrders.sort(
-                    (a, b) => (b['orderTime'] as Timestamp).compareTo(
-                      a['orderTime'] as Timestamp,
-                    ),
-                  );
-                } else {
-                  filteredOrders.sort(
-                    (a, b) => (a['orderTime'] as Timestamp).compareTo(
-                      b['orderTime'] as Timestamp,
-                    ),
-                  );
-                }
+              // Date filter
+              if (selectedYear != null && selectedMonth != null) {
+                filteredOrders = filteredOrders.where((order) {
+                  final orderDate = getOrderTime(order['orderTime']);
+                  return orderDate.year.toString() == selectedYear &&
+                      orderDate.month ==
+                          (monthOptions.indexOf(selectedMonth!) + 1);
+                }).toList();
               }
 
-              applyFilters();
+              // Payment status filter
+              if (paymentFilter != 'All') {
+                filteredOrders = filteredOrders.where((order) {
+                  final status = (order['paymentStatus'] ?? '')
+                      .toString()
+                      .toLowerCase();
+                  return status == paymentFilter.toLowerCase();
+                }).toList();
+              }
+              // Sorting
+              filteredOrders.sort((a, b) {
+                final aTime = getOrderTime(a['orderTime']);
+                final bTime = getOrderTime(b['orderTime']);
+                return sortOption == 'Latest First'
+                    ? bTime.compareTo(aTime)
+                    : aTime.compareTo(bTime);
+              });
+
               // Totals
-              double totalAmount = 0;
-              double totalPaid = 0;
+              totalAmount = 0;
+              totalPaid = 0;
               for (var order in filteredOrders) {
                 totalAmount += (order['totalAmount'] ?? 0).toDouble();
-                totalPaid += (order['paidAmount'] ?? 0).toDouble();
+                totalPaid += (order['amountPaid'] ?? 0).toDouble();
               }
-              double totalDue = totalAmount - totalPaid;
+              totalDue = totalAmount - totalPaid;
+            }
 
-              return SingleChildScrollView(
-                controller: scrollController,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Profile
-                      Center(
-                        child: customer.profileImageUrl?.isNotEmpty == true
-                            ? CircleAvatar(
-                                radius: 40,
-                                backgroundImage: NetworkImage(
-                                  customer.profileImageUrl!,
+            applyFilters(); // Initial calculation
+
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return SingleChildScrollView(
+                  controller: scrollController,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Profile
+                        Center(
+                          child: customer.profileImageUrl?.isNotEmpty == true
+                              ? CircleAvatar(
+                                  radius: 40,
+                                  backgroundImage: NetworkImage(
+                                    customer.profileImageUrl!,
+                                  ),
+                                )
+                              : const CircleAvatar(
+                                  radius: 40,
+                                  child: Icon(Icons.person, size: 40),
                                 ),
-                              )
-                            : const CircleAvatar(
-                                radius: 40,
-                                child: Icon(Icons.person, size: 40),
+                        ),
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Text(
+                            customer.name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Phone + Address
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            GestureDetector(
+                              onTap: () async {
+                                final Uri phoneUri = Uri(
+                                  scheme: 'tel',
+                                  path: customer.phone,
+                                );
+                                if (await canLaunchUrl(phoneUri)) {
+                                  await launchUrl(phoneUri);
+                                }
+                              },
+                              child: Text(
+                                "📞 ${customer.phone}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.blueAccent,
+                                  decoration: TextDecoration.underline,
+                                ),
                               ),
-                      ),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: Text(
-                          customer.name,
-                          style: const TextStyle(
-                            fontSize: 18,
+                            ),
+                            Expanded(
+                              child: Text(
+                                "🏠 ${customer.address}",
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        const Text(
+                          'Orders',
+                          style: TextStyle(
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
 
-                      // Phone + Address
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          GestureDetector(
-                            onTap: () async {
-                              final Uri phoneUri = Uri(
-                                scheme: 'tel',
-                                path: customer.phone,
-                              );
-                              if (await canLaunchUrl(phoneUri)) {
-                                await launchUrl(phoneUri);
-                              }
-                            },
-                            child: Text(
-                              "📞 ${customer.phone}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.blueAccent,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              "🏠 ${customer.address}",
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        const SizedBox(height: 12),
 
-                      const SizedBox(height: 16),
-
-                      const Text(
-                        'Orders',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Filters
-                      Row(
-                        children: [
-                          // Year Picker
-                          DropdownButton<String>(
-                            hint: const Text("Select Year"),
-                            value: selectedYear,
-                            items: yearOptions
-                                .map(
-                                  (year) => DropdownMenuItem(
-                                    value: year,
-                                    child: Text(year),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedYear = value;
-                                selectedMonth =
-                                    null; // reset month when year changes
-                              });
-                            },
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          // Month Picker (only if year is selected)
-                          if (selectedYear != null)
+                        // Filter Row
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          children: [
                             DropdownButton<String>(
-                              hint: const Text("Select Month"),
-                              value: selectedMonth,
-                              items: monthOptions
-                                  .map(
-                                    (month) => DropdownMenuItem(
-                                      value: month,
-                                      child: Text(month),
-                                    ),
-                                  )
-                                  .toList(),
+                              hint: const Text("Select Year"),
+                              value: selectedYear,
+                              items: yearOptions.map((year) {
+                                return DropdownMenuItem(
+                                  value: year,
+                                  child: Text(year),
+                                );
+                              }).toList(),
                               onChanged: (value) {
                                 setState(() {
-                                  selectedMonth = value;
+                                  selectedYear = value;
+                                  selectedMonth = null;
                                   applyFilters();
                                 });
                               },
                             ),
-
-                          const SizedBox(width: 8),
-
-                          // Sort Dropdown (unchanged)
-                          DropdownButton<String>(
-                            value: sortOption,
-                            items: ['Latest First', 'Oldest First']
-                                .map(
-                                  (option) => DropdownMenuItem(
-                                    value: option,
-                                    child: Text(option),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                sortOption = value!;
-                                applyFilters();
-                              });
-                            },
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          // Payment Status Dropdown
-                          DropdownButton<String>(
-                            value: paymentFilter,
-                            items: paymentStatusOptions
-                                .map(
-                                  (status) => DropdownMenuItem(
-                                    value: status,
-                                    child: Text(status),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                paymentFilter = value!;
-                                applyFilters();
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.clear),
-                        label: const Text("Clear Filters"),
-                        onPressed: () {
-                          setState(() {
-                            selectedYear = null;
-                            selectedMonth = null;
-                            paymentFilter = 'All';
-                            sortOption = 'Latest First';
-                            filteredOrders = [...customer.dueOrders];
-                            applyFilters(); // Optional, to reset the sort
-                          });
-                        },
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      //                       // Clear Filters Button
-                      // TextButton.icon(
-                      //   icon: const Icon(Icons.filter_alt_off_outlined, color: Colors.red),
-                      //   label: const Text("Clear Filters", style: TextStyle(color: Colors.red)),
-                      //   onPressed: () { ... }
-                      // ),
-                      const SizedBox(height: 8),
-
-                      // Totals Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          Text(
-                            '🧾 Total: ₹${totalAmount.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            '✅ Paid: ₹${totalPaid.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Colors.green),
-                          ),
-                          Text(
-                            '❌ Due: ₹${totalDue.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Orders List
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: filteredOrders.length,
-                        itemBuilder: (context, index) {
-                          final order = filteredOrders[index];
-                          final orderTime = (order['orderTime'] is Timestamp)
-                              ? (order['orderTime'] as Timestamp).toDate()
-                              : (order['orderTime'] ?? DateTime.now());
-                          final double paid = (order['paidAmount'] ?? 0)
-                              .toDouble();
-                          final double total = (order['orderAmount'] ?? 0)
-                              .toDouble();
-                          final double due = total - paid;
-
-                          return Card(
-                            child: ListTile(
-                              title: Text('₹${total.toStringAsFixed(2)}'),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Paid: ₹${paid.toStringAsFixed(2)}'),
-                                  Text('Due: ₹${due.toStringAsFixed(2)}'),
-                                  Text(
-                                    DateFormat('dd MMM yyyy').format(orderTime),
-                                  ),
-                                  Text(
-                                    'Status: ${order['paymentStatus'] ?? 'Unknown'}',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ],
+                            if (selectedYear != null)
+                              DropdownButton<String>(
+                                hint: const Text("Select Month"),
+                                value: selectedMonth,
+                                items: monthOptions.map((month) {
+                                  return DropdownMenuItem(
+                                    value: month,
+                                    child: Text(month),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    selectedMonth = value;
+                                    applyFilters();
+                                  });
+                                },
                               ),
-                              onTap: () {
-                                // 🧾 Navigate to order detail if needed
-                                // Navigator.push(...);
+                            DropdownButton<String>(
+                              value: sortOption,
+                              items: ['Latest First', 'Oldest First'].map((
+                                option,
+                              ) {
+                                return DropdownMenuItem(
+                                  value: option,
+                                  child: Text(option),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  sortOption = value!;
+                                  applyFilters();
+                                });
                               },
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                            DropdownButton<String>(
+                              value: paymentFilter,
+                              items: paymentStatusOptions.map((status) {
+                                return DropdownMenuItem(
+                                  value: status,
+                                  child: Text(status),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  paymentFilter = value!;
+                                  applyFilters();
+                                });
+                              },
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(Icons.clear),
+                              label: const Text("Clear Filters"),
+                              onPressed: () {
+                                setState(() {
+                                  selectedYear = null;
+                                  selectedMonth = null;
+                                  paymentFilter = 'All';
+                                  sortOption = 'Latest First';
+                                  applyFilters();
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // Totals Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Text(
+                              '🧾 Total: ₹${totalAmount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '✅ Paid: ₹${totalPaid.toStringAsFixed(2)}',
+                              style: const TextStyle(color: Colors.green),
+                            ),
+                            Text(
+                              '❌ Due: ₹${totalDue.toStringAsFixed(2)}',
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Orders List
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) {
+                            final order = filteredOrders[index];
+                            final orderTime = getOrderTime(order['orderTime']);
+                            final paid = (order['amountPaid'] ?? 0).toDouble();
+                            final total = (order['totalAmount'] ?? 0)
+                                .toDouble();
+                            final due = total - paid;
+
+                            return Card(
+                              child: ListTile(
+                                title: Text('₹${total.toStringAsFixed(2)}'),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Paid: ₹${paid.toStringAsFixed(2)}'),
+                                    Text('Due: ₹${due.toStringAsFixed(2)}'),
+                                    Text(
+                                      DateFormat(
+                                        'dd MMM yyyy',
+                                      ).format(orderTime),
+                                    ),
+                                    Text(
+                                      'Status: ${order['paymentStatus'] ?? 'Unknown'}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  // TODO: Open order detail if needed
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 

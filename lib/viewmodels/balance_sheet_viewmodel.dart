@@ -46,7 +46,7 @@ class BalanceSheetViewModel extends StateNotifier<BalanceSheetState> {
         final data = doc.data();
         final double amount = (data['totalAmount'] ?? 0).toDouble();
         final DateTime date =
-            (data['date'] as Timestamp?)?.toDate() ?? DateTime.now();
+            (data['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now();
 
         totalSold += amount;
 
