@@ -5,6 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/balance_sheet_provider.dart';
 import '../../models/balance_sheet_state.dart';
 import '../../models/transaction_entry.dart';
+import '../../repositories/customer_repository.dart';
+import '../../providers/due_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class BalanceSheetScreen extends ConsumerStatefulWidget {
   const BalanceSheetScreen({super.key});
@@ -21,12 +24,32 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
 
   // final int dueCustomerCount;
   final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+  String dateFilter = 'All Dates';
+  String? selectedMonthYear;
+  String sortOption = 'Latest First';
+  String paymentFilter = 'All';
+  final paymentStatusOptions = ['All', 'Paid', 'Unpaid', 'Partial'];
+  // List of months for selection
+  List<String> monthYearOptions = [];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDataForCurrentMonth();
+      _generateMonthYearOptions();
+    });
+  }
+
+  void _generateMonthYearOptions() {
+    final now = DateTime.now();
+    final List<String> options = [];
+    for (int i = 0; i < 12; i++) {
+      final date = DateTime(now.year, now.month - i, 1);
+      options.add(DateFormat('MMMM yyyy').format(date));
+    }
+    setState(() {
+      monthYearOptions = options;
     });
   }
 
@@ -44,58 +67,62 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
   void _loadDataForCustom(DateTimeRange range) {
     ref.read(balanceSheetProvider.notifier).loadData(range: range);
   }
-@override
-Widget build(BuildContext context) {
-  final state = ref.watch(balanceSheetProvider);
 
-  return Scaffold(
-    appBar: AppBar(title: const Text('Balance Sheet')),
-    body: Column(
-      children: [
-        Material(
-          elevation: 2,
-          child: _buildFilterSection(), // Fixed filter
-        ),
-        Expanded(
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (scrollNotification) {
-              if (scrollNotification is ScrollUpdateNotification) {
-                setState(() {
-                  _cardScale = (1.0 - (scrollNotification.metrics.pixels / 200))
-                      .clamp(0.85, 1.0);
-                });
-              }
-              return false;
-            },
-            child: ListView(
-              padding: const EdgeInsets.only(top: 8),
-              children: [
-                Transform(
-                  transform: Matrix4.identity()..scale(1.0, _cardScale),
-                  alignment: Alignment.topCenter,
-                  child: _buildSummaryGrid(state),
-                ),
-                const Divider(),
-                if (state.isLoading)
-                  const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (state.error != null)
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Center(child: Text('Error: ${state.error}')),
-                  )
-                else
-                  _buildTransactionList(state.transactions),
-              ],
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(balanceSheetProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Balance Sheet')),
+      body: Column(
+        children: [
+          Material(
+            elevation: 2,
+            child: _buildFilterSection(), // Fixed filter
+          ),
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (scrollNotification) {
+                if (scrollNotification is ScrollUpdateNotification) {
+                  setState(() {
+                    _cardScale =
+                        (1.0 - (scrollNotification.metrics.pixels / 200)).clamp(
+                          0.85,
+                          1.0,
+                        );
+                  });
+                }
+                return false;
+              },
+              child: ListView(
+                padding: const EdgeInsets.only(top: 8),
+                children: [
+                  Transform(
+                    transform: Matrix4.identity()..scale(1.0, _cardScale),
+                    alignment: Alignment.topCenter,
+                    child: _buildSummaryGrid(state),
+                  ),
+                  const Divider(),
+                  if (state.isLoading)
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (state.error != null)
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Center(child: Text('Error: ${state.error}')),
+                    )
+                  else
+                    _buildTransactionList(state.transactions),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   void _applyQuickFilter(String key) {
     final range = _getRangeFromQuickFilter(key);
@@ -263,33 +290,33 @@ Widget build(BuildContext context) {
             crossAxisSpacing: 8,
             children: [
               FutureBuilder<double>(
-  future: _calculateTotalSold(),
-  builder: (context, snapshot) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return _buildSummaryCard(
-        'Total Sold',
-        'Loading...',
-        Colors.green[300]!,
-        () {}, // disabled during loading
-      );
-    } else if (snapshot.hasError) {
-      return _buildSummaryCard(
-        'Total Sold',
-        'Error',
-        Colors.green[300]!,
-        () {},
-      );
-    } else {
-      final total = snapshot.data ?? 0.0;
-      return _buildSummaryCard(
-        'Total Sold',
-        '₹${total.toStringAsFixed(2)}',
-        Colors.green[300]!,
-        () => _showTotalSoldDetails(context),
-      );
-    }
-  },
-),
+                future: _calculateTotalSold(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return _buildSummaryCard(
+                      'Total Sold',
+                      'Loading...',
+                      Colors.green[300]!,
+                      () {},
+                    );
+                  } else if (snapshot.hasError) {
+                    return _buildSummaryCard(
+                      'Total Sold',
+                      'Error',
+                      Colors.green[300]!,
+                      () {},
+                    );
+                  } else {
+                    final total = snapshot.data ?? 0.0;
+                    return _buildSummaryCard(
+                      'Total Sold',
+                      '₹${total.toStringAsFixed(2)}',
+                      Colors.green[300]!,
+                      () => _showTotalSoldDetails(context),
+                    );
+                  }
+                },
+              ),
 
               _buildSummaryCard(
                 'Total Expenses',
@@ -312,7 +339,7 @@ Widget build(BuildContext context) {
               'Due Amounts',
               '₹${state.dueAmounts.toStringAsFixed(2)} from ${state.dueCustomerCount} Customers',
               Colors.orange[400]!,
-              () => _showDueAmountsDetails(context),
+              () => _showDueCustomersBottomSheet(context),
             ),
           ),
         ],
@@ -357,78 +384,96 @@ Widget build(BuildContext context) {
       ),
     );
   }
-Widget _buildTransactionList(List<TransactionEntry> transactions) {
-  if (transactions.isEmpty) {
-    return const Center(child: Text('No transactions found for this period.'));
+
+  Widget _buildTransactionList(List<TransactionEntry> transactions) {
+    if (transactions.isEmpty) {
+      return const Center(
+        child: Text('No transactions found for this period.'),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: transactions.length,
+      itemBuilder: (context, index) {
+        final tx = transactions[index];
+        final bgColor = tx.type == 'sold'
+            ? const Color.fromARGB(255, 78, 184, 81) // Greenish for sales
+            : const Color.fromARGB(255, 176, 57, 10); // Reddish for expenses
+
+        return GestureDetector(
+          onTap: () =>
+              _showTransactionDetail(context, tx), // 👈 shows full info on tap
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tx.type == 'sold'
+                      ? 'Customer: ${tx.description}' // 👈 stored as description
+                      : 'Expense: ${tx.description}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  '₹${tx.amount.toStringAsFixed(2)}',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                if (tx.type == 'sold')
+                  Text(
+                    'Item Type: ${tx.itemType ?? 'Unknown'}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                Text(
+                  'Date: ${dateFormat.format(tx.addedAt)}',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                Text(
+                  'Type: ${tx.type.toUpperCase()}',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
-  return ListView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    itemCount: transactions.length,
-    itemBuilder: (context, index) {
-      final tx = transactions[index];
-      final bgColor = tx.type == 'sold'
-          ? const Color.fromARGB(255, 78, 184, 81) // Greenish for sales
-          : const Color.fromARGB(255, 176, 57, 10); // Reddish for expenses
-
-      return GestureDetector(
-        onTap: () => _showTransactionDetail(context, tx), // 👈 shows full info on tap
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tx.type == 'sold'
-                    ? 'Customer: ${tx.description}' // 👈 stored as description
-                    : 'Expense: ${tx.description}',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              Text('₹${tx.amount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white)),
-              if (tx.type == 'sold')
-                Text('Item Type: ${tx.itemType ?? 'Unknown'}',
-                    style: const TextStyle(color: Colors.white)),
-              Text('Date: ${dateFormat.format(tx.addedAt)}',
-                  style: const TextStyle(color: Colors.white)),
-              Text('Type: ${tx.type.toUpperCase()}', style: const TextStyle(color: Colors.white)),
-            ],
-          ),
+  void _showTransactionDetail(BuildContext context, TransactionEntry tx) {
+    final isExpense = tx.type == 'expense';
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(tx.description),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Amount: ₹${tx.amount.toStringAsFixed(2)}'),
+            if (tx.itemType != null) Text('Item Type: ${tx.itemType}'),
+            Text('Type: ${isExpense ? 'Expense' : 'Sold'}'),
+            Text('Date: ${dateFormat.format(tx.addedAt)}'),
+          ],
         ),
-      );
-    },
-  );
-}
-
-
-void _showTransactionDetail(BuildContext context, TransactionEntry tx) {
-  final isExpense = tx.type == 'expense';
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(tx.description),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Amount: ₹${tx.amount.toStringAsFixed(2)}'),
-          if (tx.itemType != null) Text('Item Type: ${tx.itemType}'),
-          Text('Type: ${isExpense ? 'Expense' : 'Sold'}'),
-          Text('Date: ${dateFormat.format(tx.addedAt)}'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
         ],
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-      ],
-    ),
-  );
-}
-
+    );
+  }
 
   void _showDataSheet<T>(
     BuildContext context,
@@ -487,93 +532,90 @@ void _showTransactionDetail(BuildContext context, TransactionEntry tx) {
       ),
     );
   }
-Future<List<TransactionEntry>> fetchAllTransactions() async {
-  final range = _getSelectedRange();
 
-  // Fetch expenses
-  final expenseSnap = await FirebaseFirestore.instance
-      .collection('expenses')
-      .where('addedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
-      .where('addedAt', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
-      .get();
+  Future<List<TransactionEntry>> fetchAllTransactions() async {
+    final range = _getSelectedRange();
 
-  final expenses = expenseSnap.docs.map((doc) {
-    final d = doc.data();
-    return TransactionEntry(
-      id: doc.id,
-      type: 'expense',
-      description: d['description'] ?? '',
-      amount: (d['amount'] ?? 0).toDouble(),
-      addedAt: (d['addedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-    );
-  });
+    // Fetch expenses
+    final expenseSnap = await FirebaseFirestore.instance
+        .collection('expenses')
+        .where(
+          'addedAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(range.start),
+        )
+        .where('addedAt', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
+        .get();
 
-  // Fetch orders
-  final orderSnap = await FirebaseFirestore.instance
-      .collection('orders')
-      .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
-      .where('orderTime', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
-      .get();
+    final expenses = expenseSnap.docs.map((doc) {
+      final d = doc.data();
+      return TransactionEntry(
+        id: doc.id,
+        type: 'expense',
+        description: d['description'] ?? '',
+        amount: (d['amount'] ?? 0).toDouble(),
+        addedAt: (d['addedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      );
+    });
 
-  final orders = orderSnap.docs.map((doc) {
-    final d = doc.data();
-    return TransactionEntry(
-      id: doc.id,
-      type: 'sold',
-      description: d['customerName'] ?? 'Unknown',
-      amount: (d['totalAmount'] ?? 0).toDouble(),
-      addedAt: (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      itemType: d['itemType'] ?? 'Unknown',
-    );
-  });
+    // Fetch orders
+    final orderSnap = await FirebaseFirestore.instance
+        .collection('orders')
+        .where(
+          'orderTime',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(range.start),
+        )
+        .where('orderTime', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
+        .get();
 
-  // Merge & sort
-  final allTransactions = [...expenses, ...orders].toList()
-    ..sort((a, b) => b.addedAt.compareTo(a.addedAt)); // latest first
+    final orders = orderSnap.docs.map((doc) {
+      final d = doc.data();
+      return TransactionEntry(
+        id: doc.id,
+        type: 'sold',
+        description: d['customerName'] ?? 'Unknown',
+        amount: (d['totalAmount'] ?? 0).toDouble(),
+        addedAt: (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        itemType: d['itemType'] ?? 'Unknown',
+      );
+    });
 
-  return allTransactions;
-}
+    // Merge & sort
+    final allTransactions = [...expenses, ...orders].toList()
+      ..sort((a, b) => b.addedAt.compareTo(a.addedAt)); // latest first
 
-
-Future<List<Map<String, dynamic>>> _fetchOrdersForPeriod() async {
-  final range = _getSelectedRange();
-
-  final snap = await FirebaseFirestore.instance
-      .collection('orders')
-      .where('orderTime', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
-      .where('orderTime', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
-      .get();
-
-  final list = snap.docs.map((doc) {
-    final d = doc.data();
-    return {
-      'id': doc.id,
-      'totalSold': (d['totalAmount'] as num?)?.toDouble() ?? 0.0,
-      'customerName': d['customerName'] ?? 'Unknown',
-      'orderTime': (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      'itemType': d['itemType'] ?? 'Unknown',
-    };
-  }).toList();
-
-  return list.reversed.toList();
-}
-Future<double> _calculateTotalSold() async {
-  final orders = await _fetchOrdersForPeriod();
-
-  double total = 0.0;
-
-  for (final order in orders) {
-    final rawAmount = order['totalSold'];
-    if (rawAmount is num) {
-      total += rawAmount.toDouble();
-    } else if (rawAmount is String) {
-      total += double.tryParse(rawAmount) ?? 0.0;
-    }
+    return allTransactions;
   }
 
-  return total;
-}
+  Future<List<Map<String, dynamic>>> _fetchOrdersForPeriod() async {
+    final range = _getSelectedRange();
 
+    final snap = await FirebaseFirestore.instance
+        .collectionGroup('orders') // 🔥 Query all 'orders' subcollections
+        .where(
+          'orderTime',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(range.start),
+        )
+        .where('orderTime', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
+        .get();
+
+    final list = snap.docs.map((doc) {
+      final d = doc.data();
+      return {
+        'id': doc.id,
+        'totalSold': (d['totalAmount'] as num?)?.toDouble() ?? 0.0,
+        'customerName': d['customerName'] ?? 'Unknown',
+        'orderTime': (d['orderTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        'itemType': d['item'] ?? 'Unknown',
+      };
+    }).toList();
+
+    return list.reversed.toList();
+  }
+
+  Future<double> _calculateTotalSold() async {
+    final repo = CustomerRepository();
+    return await repo.getTotalSoldAcrossAllCustomers();
+  }
 
   Future<List<Map<String, dynamic>>> _fetchExpensesForPeriod({
     String? filterType,
@@ -606,23 +648,35 @@ Future<double> _calculateTotalSold() async {
     return expensesList.reversed.toList();
   }
 
-  Future<List<Map<String, dynamic>>> _fetchDueOrdersForPeriod() async {
-    final range = _getSelectedRange();
-    final snap = await FirebaseFirestore.instance
+  Future<List<Map<String, dynamic>>> fetchCustomerDueOrders(
+    String customerId,
+  ) async {
+    final ordersSnap = await FirebaseFirestore.instance
+        .collection('customers')
+        .doc(customerId)
         .collection('orders')
-        .where('dueAmount', isGreaterThan: 0)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(range.start))
-        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(range.end))
         .get();
 
-    return snap.docs.map((doc) {
-      final d = (doc.data() as Map<String, dynamic>?) ?? {};
-      return {
-        'dueAmount': (d['dueAmount'] ?? 0).toDouble(),
-        'customer': d['customerName'] ?? 'N/A',
-        'date': (d['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      };
-    }).toList();
+    List<Map<String, dynamic>> dueOrders = [];
+
+    for (final doc in ordersSnap.docs) {
+      final data = doc.data();
+      final total = (data['totalAmount'] ?? 0).toDouble();
+      final paid = (data['amountPaid'] ?? 0).toDouble();
+      final due = total - paid;
+
+      if (due > 0) {
+        dueOrders.add({
+          'item': data['itemName'] ?? 'Unknown',
+          'date': (data['orderTime'] as Timestamp?)?.toDate(),
+          'totalAmount': total,
+          'amountPaid': paid,
+          'dueAmount': due,
+        });
+      }
+    }
+
+    return dueOrders;
   }
 
   DateTimeRange _getSelectedRange() {
@@ -631,15 +685,12 @@ Future<double> _calculateTotalSold() async {
     final end = DateTime(selectedYear, monthIndex + 1, 0, 23, 59, 59);
     return customRange ?? DateTimeRange(start: start, end: end);
   }
-void _showTotalSoldDetails(BuildContext context) async {
-  final orders = await _fetchOrdersForPeriod();
 
-  if (context.mounted) {
-    _showDataSheet(
-      context,
-      'Total Sold Details',
-      orders,
-      (order) {
+  void _showTotalSoldDetails(BuildContext context) async {
+    final orders = await _fetchOrdersForPeriod();
+
+    if (context.mounted) {
+      _showDataSheet(context, 'Total Sold Details', orders, (order) {
         double amount = 0.0;
         final rawAmount = order['totalSold'] ?? order['totalAmount'] ?? 0.0;
 
@@ -677,10 +728,7 @@ void _showTotalSoldDetails(BuildContext context) async {
           child: ListTile(
             title: Text(
               '₹${amount.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -699,10 +747,9 @@ void _showTotalSoldDetails(BuildContext context) async {
             ),
           ),
         );
-      },
-    );
+      });
+    }
   }
-}
 
   void _showTotalExpensesDetails(
     BuildContext context, {
@@ -784,57 +831,489 @@ void _showTotalSoldDetails(BuildContext context) async {
   //   );
   // }
 
-  void _showDueAmountsDetails(BuildContext context) async {
-    final dues = await _fetchDueOrdersForPeriod();
-    // Sort dues by descending date
-    dues.sort((a, b) {
-      final dateA = a['date'] as DateTime?;
-      final dateB = b['date'] as DateTime?;
-      return dateB?.compareTo(dateA ?? DateTime(0)) ?? 0;
-    });
-
-    if (context.mounted) {
-      _showDataSheet(context, 'Due Amounts Details', dues, (order) {
-        final dueAmount = (order['dueAmount'] as num?)?.toDouble() ?? 0.0;
-        final customer = order['customer'] ?? 'Unknown';
-        final date = (order['date'] is DateTime)
-            ? dateFormat.format(order['date'])
-            : 'Unknown';
-
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.orange[100],
-            borderRadius: BorderRadius.circular(10),
-          ),
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          child: ListTile(
-            title: Text(
-              '₹${dueAmount.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6),
+  void _showDueCustomersBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.9,
+          minChildSize: 0.6,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Customer: $customer',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  // Header
+                  Center(
+                    child: Container(
+                      width: 50,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text('Date: $date'),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Customers with Outstanding Dues',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final allCustomersAsync = ref.watch(
+                          allCustomersWithDueProvider,
+                        );
+
+                        return allCustomersAsync.when(
+                          data: (customers) {
+                            if (customers.isEmpty) {
+                              return const Center(
+                                child: Text('No customers found.'),
+                              );
+                            }
+                            return ListView.builder(
+                              controller: scrollController,
+                              itemCount: customers.length,
+                              itemBuilder: (context, index) {
+                                final customer = customers[index];
+                                final due = customer.totalDue;
+                                final cardColor = due <= 0
+                                    ? Colors.grey[100]
+                                    : due < 1000
+                                    ? Colors.green[100]
+                                    : due < 0
+                                    ? Colors.orange[100]
+                                    : Colors.red[100];
+
+                                return Card(
+                                  color: cardColor,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  margin: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  child: ListTile(
+                                    leading:
+                                        customer.profileImageUrl?.isNotEmpty ==
+                                            true
+                                        ? CircleAvatar(
+                                            backgroundImage: NetworkImage(
+                                              customer.profileImageUrl!,
+                                            ),
+                                          )
+                                        : const CircleAvatar(
+                                            child: Icon(Icons.person),
+                                          ),
+                                    title: Text(
+                                      customer.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '📞 ${customer.phone}\n🏠 ${customer.address}',
+                                    ),
+                                    isThreeLine: true,
+                                    trailing: Text(
+                                      '₹${due.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    onTap: () => _showCustomerDetailBottomSheet(
+                                      context,
+                                      customer,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
+                          error: (err, _) => Center(child: Text('Error: $err')),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ),
+            );
+          },
         );
-      });
-    }
+      },
+    );
+  }
+
+  void _showCustomerDetailBottomSheet(BuildContext context, dynamic customer) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        builder: (context, scrollController) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              String? selectedYear;
+              String? selectedMonth;
+
+              final List<String> yearOptions = ['2024', '2025'];
+
+              final List<String> monthOptions = [
+                'January',
+                'February',
+                'March',
+                'April',
+                'May',
+                'June',
+                'July',
+                'August',
+                'September',
+                'October',
+                'November',
+                'December',
+              ];
+
+              final paymentStatusOptions = ['All', 'Paid', 'Unpaid', 'Partial'];
+              String paymentFilter = 'All';
+              String sortOption = 'Latest First';
+
+              List<Map<String, dynamic>> filteredOrders = [
+                ...customer.dueOrders,
+              ];
+
+              void applyFilters() {
+                filteredOrders = [...customer.dueOrders];
+
+                if (selectedYear != null && selectedMonth != null) {
+                  filteredOrders = filteredOrders.where((order) {
+                    final orderDate = (order['orderTime'] as Timestamp)
+                        .toDate();
+                    final monthMatch =
+                        orderDate.month ==
+                        monthOptions.indexOf(selectedMonth!) + 1;
+                    final yearMatch = orderDate.year.toString() == selectedYear;
+                    return monthMatch && yearMatch;
+                  }).toList();
+                }
+
+                if (paymentFilter != 'All') {
+                  filteredOrders = filteredOrders
+                      .where((order) => order['paymentStatus'] == paymentFilter)
+                      .toList();
+                }
+
+                if (sortOption == 'Latest First') {
+                  filteredOrders.sort(
+                    (a, b) => (b['orderTime'] as Timestamp).compareTo(
+                      a['orderTime'] as Timestamp,
+                    ),
+                  );
+                } else {
+                  filteredOrders.sort(
+                    (a, b) => (a['orderTime'] as Timestamp).compareTo(
+                      b['orderTime'] as Timestamp,
+                    ),
+                  );
+                }
+              }
+
+              applyFilters();
+              // Totals
+              double totalAmount = 0;
+              double totalPaid = 0;
+              for (var order in filteredOrders) {
+                totalAmount += (order['totalAmount'] ?? 0).toDouble();
+                totalPaid += (order['paidAmount'] ?? 0).toDouble();
+              }
+              double totalDue = totalAmount - totalPaid;
+
+              return SingleChildScrollView(
+                controller: scrollController,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Profile
+                      Center(
+                        child: customer.profileImageUrl?.isNotEmpty == true
+                            ? CircleAvatar(
+                                radius: 40,
+                                backgroundImage: NetworkImage(
+                                  customer.profileImageUrl!,
+                                ),
+                              )
+                            : const CircleAvatar(
+                                radius: 40,
+                                child: Icon(Icons.person, size: 40),
+                              ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          customer.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Phone + Address
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              final Uri phoneUri = Uri(
+                                scheme: 'tel',
+                                path: customer.phone,
+                              );
+                              if (await canLaunchUrl(phoneUri)) {
+                                await launchUrl(phoneUri);
+                              }
+                            },
+                            child: Text(
+                              "📞 ${customer.phone}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.blueAccent,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              "🏠 ${customer.address}",
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Orders',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Filters
+                      Row(
+                        children: [
+                          // Year Picker
+                          DropdownButton<String>(
+                            hint: const Text("Select Year"),
+                            value: selectedYear,
+                            items: yearOptions
+                                .map(
+                                  (year) => DropdownMenuItem(
+                                    value: year,
+                                    child: Text(year),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                selectedYear = value;
+                                selectedMonth =
+                                    null; // reset month when year changes
+                              });
+                            },
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          // Month Picker (only if year is selected)
+                          if (selectedYear != null)
+                            DropdownButton<String>(
+                              hint: const Text("Select Month"),
+                              value: selectedMonth,
+                              items: monthOptions
+                                  .map(
+                                    (month) => DropdownMenuItem(
+                                      value: month,
+                                      child: Text(month),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedMonth = value;
+                                  applyFilters();
+                                });
+                              },
+                            ),
+
+                          const SizedBox(width: 8),
+
+                          // Sort Dropdown (unchanged)
+                          DropdownButton<String>(
+                            value: sortOption,
+                            items: ['Latest First', 'Oldest First']
+                                .map(
+                                  (option) => DropdownMenuItem(
+                                    value: option,
+                                    child: Text(option),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                sortOption = value!;
+                                applyFilters();
+                              });
+                            },
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          // Payment Status Dropdown
+                          DropdownButton<String>(
+                            value: paymentFilter,
+                            items: paymentStatusOptions
+                                .map(
+                                  (status) => DropdownMenuItem(
+                                    value: status,
+                                    child: Text(status),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                paymentFilter = value!;
+                                applyFilters();
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.clear),
+                        label: const Text("Clear Filters"),
+                        onPressed: () {
+                          setState(() {
+                            selectedYear = null;
+                            selectedMonth = null;
+                            paymentFilter = 'All';
+                            sortOption = 'Latest First';
+                            filteredOrders = [...customer.dueOrders];
+                            applyFilters(); // Optional, to reset the sort
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      //                       // Clear Filters Button
+                      // TextButton.icon(
+                      //   icon: const Icon(Icons.filter_alt_off_outlined, color: Colors.red),
+                      //   label: const Text("Clear Filters", style: TextStyle(color: Colors.red)),
+                      //   onPressed: () { ... }
+                      // ),
+                      const SizedBox(height: 8),
+
+                      // Totals Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Text(
+                            '🧾 Total: ₹${totalAmount.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '✅ Paid: ₹${totalPaid.toStringAsFixed(2)}',
+                            style: const TextStyle(color: Colors.green),
+                          ),
+                          Text(
+                            '❌ Due: ₹${totalDue.toStringAsFixed(2)}',
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Orders List
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: filteredOrders.length,
+                        itemBuilder: (context, index) {
+                          final order = filteredOrders[index];
+                          final orderTime = (order['orderTime'] is Timestamp)
+                              ? (order['orderTime'] as Timestamp).toDate()
+                              : (order['orderTime'] ?? DateTime.now());
+                          final double paid = (order['paidAmount'] ?? 0)
+                              .toDouble();
+                          final double total = (order['orderAmount'] ?? 0)
+                              .toDouble();
+                          final double due = total - paid;
+
+                          return Card(
+                            child: ListTile(
+                              title: Text('₹${total.toStringAsFixed(2)}'),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Paid: ₹${paid.toStringAsFixed(2)}'),
+                                  Text('Due: ₹${due.toStringAsFixed(2)}'),
+                                  Text(
+                                    DateFormat('dd MMM yyyy').format(orderTime),
+                                  ),
+                                  Text(
+                                    'Status: ${order['paymentStatus'] ?? 'Unknown'}',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                // 🧾 Navigate to order detail if needed
+                                // Navigator.push(...);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 
   void _showRawPurchasesDetails(BuildContext context) async {
-    final expenses = await _fetchExpensesForPeriod(filterType: 'RAW Material');
+    final expenses = await _fetchExpensesForPeriod(filterType: 'Raw Material');
 
     // Sort by addedAt descending
     expenses.sort((a, b) {

@@ -55,7 +55,7 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
   Future<void> _fetchPreparedItems() async {
     final snapshot = await FirebaseFirestore.instance
         .collection('inventory')
-        .where('type', isEqualTo: 'PREPARED')
+        .where('type', isEqualTo: 'Prepared')
         .get();
 
     setState(() {

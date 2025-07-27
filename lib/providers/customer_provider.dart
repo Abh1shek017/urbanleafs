@@ -17,6 +17,10 @@ final customerDueAmountProvider = StreamProvider.family<double, String>((ref, cu
   final repo = ref.read(customerRepoProvider);
   return repo.watchDueAmount(customerId);
 });
+final totalSoldProvider = FutureProvider<double>((ref) async {
+  final repository = ref.read(customerRepoProvider);
+  return repository.getTotalSoldAcrossAllCustomers();
+});
 
 /// 🔹 Holds currently selected customer (can be null initially)
 final selectedCustomerProvider = StateProvider<CustomerModel?>((ref) => null);

@@ -1,24 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import '../../providers/payment_provider.dart';
 import '../../constants/app_constants.dart';
-// import '../../utils/notifications_util.dart';
 import '../../viewmodels/payment_viewmodel.dart';
 import '../../models/payment_model.dart';
-// import '../../repositories/customer_repository.dart';
 import '../../providers/customer_provider.dart';
 
 class CustomerEntry {
   final String id;
   final String name;
-  // final double dueAmount;
 
-
-  CustomerEntry({required this.id, 
-  required this.name,
-  // this.dueAmount = 0.0,
-  });
+  CustomerEntry({required this.id, required this.name});
 }
 
 class AddPaymentCard extends ConsumerStatefulWidget {
@@ -46,35 +38,35 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
     _loadCustomers();
   }
 
-  void debugIndex(BuildContext context) async {
-    try {
-      final firestore = FirebaseFirestore.instance;
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+  // void debugIndex(BuildContext context) async {
+  //   try {
+  //     final firestore = FirebaseFirestore.instance;
+  //     final now = DateTime.now();
+  //     final startOfDay = DateTime(now.year, now.month, now.day);
+  //     final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-      final snapshot = await firestore
-          .collectionGroup('payments')
-          .where(
-            'receivedTime',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-          )
-          .where(
-            'receivedTime',
-            isLessThanOrEqualTo: Timestamp.fromDate(endOfDay),
-          )
-          .orderBy('receivedTime', descending: true)
-          .limit(1)
-          .get();
+  //     final snapshot = await firestore
+  //         .collectionGroup('payments')
+  //         .where(
+  //           'receivedTime',
+  //           isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+  //         )
+  //         .where(
+  //           'receivedTime',
+  //           isLessThanOrEqualTo: Timestamp.fromDate(endOfDay),
+  //         )
+  //         .orderBy('receivedTime', descending: true)
+  //         .limit(1)
+  //         .get();
 
-      debugPrint("Index working. Docs found: ${snapshot.docs.length}");
-    } catch (e) {
-      debugPrint("🔥 Index error: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Firestore error: $e")));
-    }
-  }
+  //     debugPrint("Index working. Docs found: ${snapshot.docs.length}");
+  //   } catch (e) {
+  //     debugPrint("🔥 Index error: $e");
+  //     ScaffoldMessenger.of(
+  //       context,
+  //     ).showSnackBar(SnackBar(content: Text("Firestore error: $e")));
+  //   }
+  // }
 
   @override
   void dispose() {
@@ -83,38 +75,40 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
   }
 
   Future<void> _loadCustomers() async {
-  try {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('customers')
-        .get();
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('customers')
+          .get();
 
-    final List<CustomerEntry> customers = [];
+      final List<CustomerEntry> customers = [];
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      final name = data['name'] ?? 'Unnamed';
-      final id = doc.id;
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final name = data['name'] ?? 'Unnamed';
+        final id = doc.id;
 
-      customers.add(
-        CustomerEntry(id: id, name: name), // dueAmount will be loaded by provider
-      );
+        customers.add(
+          CustomerEntry(
+            id: id,
+            name: name,
+          ), // dueAmount will be loaded by provider
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _customerList = customers;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
     }
-
-    if (!mounted) return;
-    setState(() {
-      _customerList = customers;
-      _loading = false;
-      _error = null;
-    });
-  } catch (e) {
-    if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _error = e.toString();
-    });
   }
-}
-
 
   void _submitPayment() async {
     if (_formKey.currentState!.validate()) {
@@ -212,36 +206,36 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
                 const Text('No customers available')
               else
                 DropdownButtonFormField<CustomerEntry>(
-  value: _selectedCustomer,
-  hint: const Text("Select Customer"),
-  onChanged: (val) {
-    setState(() {
-      _selectedCustomer = val;
-      _selectedCustomerId = val?.id;
-    });
-  },
-  validator: (val) => val == null ? 'Select a customer' : null,
-  decoration: const InputDecoration(labelText: 'Customer Name'),
-  items: _customerList.map((entry) {
-    return DropdownMenuItem<CustomerEntry>(
-      value: entry,
-      child: Consumer(
-        builder: (context, ref, _) {
-          final asyncDue = ref.watch(
-            customerDueAmountProvider(entry.id),
-          );
-          return asyncDue.when(
-            data: (due) => Text(
-              '${entry.name} (₹${due.toStringAsFixed(2)})',
-            ),
-            loading: () => Text('${entry.name} (Loading...)'),
-            error: (_, __) => Text('${entry.name} (Err)'),
-          );
-        },
-      ),
-    );
-  }).toList(),
-),
+                  value: _selectedCustomer,
+                  hint: const Text("Select Customer"),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedCustomer = val;
+                      _selectedCustomerId = val?.id;
+                    });
+                  },
+                  validator: (val) => val == null ? 'Select a customer' : null,
+                  decoration: const InputDecoration(labelText: 'Customer Name'),
+                  items: _customerList.map((entry) {
+                    return DropdownMenuItem<CustomerEntry>(
+                      value: entry,
+                      child: Consumer(
+                        builder: (context, ref, _) {
+                          final asyncDue = ref.watch(
+                            customerDueAmountProvider(entry.id),
+                          );
+                          return asyncDue.when(
+                            data: (due) => Text(
+                              '${entry.name} (₹${due.toStringAsFixed(2)})',
+                            ),
+                            loading: () => Text('${entry.name} (Loading...)'),
+                            error: (_, __) => Text('${entry.name} (Err)'),
+                          );
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
 
               const SizedBox(height: 12),
               Row(

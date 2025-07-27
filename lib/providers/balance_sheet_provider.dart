@@ -86,7 +86,7 @@ class BalanceSheetNotifier extends StateNotifier<BalanceSheetState> {
 
         final entry = TransactionEntry(
           id: doc.id,
-          type: type == 'raw' ? 'raw_purchase' : 'expense',
+          type: type == 'raw material' ? 'raw_purchase' : 'expense',
           description: description,
           amount: amt,
           addedAt: addedAt,
