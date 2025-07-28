@@ -12,11 +12,9 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
   final MasterDataService _service = MasterDataService();
   bool _loading = false;
   Map<String, dynamic> masterData = {
-    "customers": [],
     "inventoryTypes": [],
     "units": [],
     "itemTypes": [],
-    "orderItems": [],
     "expenseTypes": [],
   };
 
@@ -28,6 +26,13 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
 
   Future<void> _loadData() async {
     final data = await _service.loadLocalMasterData();
+    final allowedKeys = [
+      'inventoryTypes',
+      'units',
+      'itemTypes',
+      'expenseTypes',
+    ];
+    data.removeWhere((key, _) => !allowedKeys.contains(key));
     setState(() {
       masterData = data;
     });
@@ -42,14 +47,12 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
 
   Future<void> _saveData() async {
     // Save all fields to Firebase and local cache
-    await _service.updateMasterField('customers', masterData['customers']);
     await _service.updateMasterField(
       'inventoryTypes',
       masterData['inventoryTypes'],
     );
     await _service.updateMasterField('units', masterData['units']);
     await _service.updateMasterField('itemTypes', masterData['itemTypes']);
-    await _service.updateMasterField('orderItems', masterData['orderItems']);
     await _service.updateMasterField(
       'expenseTypes',
       masterData['expenseTypes'],
@@ -182,10 +185,6 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                       _buildSection("units"),
                       _buildSection("itemTypes"),
                     ],
-                  ),
-                  ExpansionTile(
-                    title: const Text("Orders Edit"),
-                    children: [_buildSection("orderItems")],
                   ),
                   ExpansionTile(
                     title: const Text("Expenses Edit"),

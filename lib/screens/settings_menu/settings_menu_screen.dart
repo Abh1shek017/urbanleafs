@@ -83,12 +83,6 @@ class _SettingsMenuScreenState extends ConsumerState<SettingsMenuScreen>
         ),
         _menuTile(
           context,
-          "Orders Edit",
-          Icons.shopping_cart,
-          '/master-data/orders',
-        ),
-        _menuTile(
-          context,
           "Expenses Edit",
           Icons.money_off,
           '/master-data/expenses',

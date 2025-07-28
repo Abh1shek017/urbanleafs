@@ -7,14 +7,16 @@ import 'package:urbanleafs/services/local_storage_service.dart';
 import 'package:urbanleafs/themes/app_theme.dart';
 import 'package:urbanleafs/themes/dark_theme.dart';
 import 'package:urbanleafs/providers/theme_provider.dart';
+import 'package:urbanleafs/services/master_data_service.dart';
 
 /// ✅ Global RouteObserver
-final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-
+  await MasterDataService().fetchAndUpdateFromFirestore();
   // ✅ Enable Firestore offline persistence
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
@@ -25,6 +27,7 @@ Future<void> main() async {
 
   runApp(ProviderScope(child: MyApp(localStorage: localStorage)));
 }
+
 
 class MyApp extends ConsumerWidget {
   final LocalStorageService localStorage;
