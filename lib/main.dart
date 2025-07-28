@@ -38,7 +38,7 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       routerConfig: router,
-      title: 'Paper Plate Manager',
+      title: 'UrbanLeafs',
       theme: AppThemeManager.getThemeFromEnum(AppTheme.light),
       darkTheme: DarkTheme.theme,
       themeMode: themeMode,
