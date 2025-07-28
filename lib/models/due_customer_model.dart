@@ -4,6 +4,7 @@ class CustomerWithDue {
   late String? profileImageUrl;
   final List<Map<String, dynamic>> dueOrders;
   final List<Map<String, dynamic>> allOrders;
+  final List<Map<String, dynamic>> payments;
   final double totalDue;
   final String address;
 
@@ -15,5 +16,7 @@ class CustomerWithDue {
     required this.totalDue,
     required this.address,
     required this.allOrders,
+    required this.payments,
+    
   });
 }

@@ -38,36 +38,6 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
     _loadCustomers();
   }
 
-  // void debugIndex(BuildContext context) async {
-  //   try {
-  //     final firestore = FirebaseFirestore.instance;
-  //     final now = DateTime.now();
-  //     final startOfDay = DateTime(now.year, now.month, now.day);
-  //     final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
-
-  //     final snapshot = await firestore
-  //         .collectionGroup('payments')
-  //         .where(
-  //           'receivedTime',
-  //           isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-  //         )
-  //         .where(
-  //           'receivedTime',
-  //           isLessThanOrEqualTo: Timestamp.fromDate(endOfDay),
-  //         )
-  //         .orderBy('receivedTime', descending: true)
-  //         .limit(1)
-  //         .get();
-
-  //     debugPrint("Index working. Docs found: ${snapshot.docs.length}");
-  //   } catch (e) {
-  //     debugPrint("🔥 Index error: $e");
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(SnackBar(content: Text("Firestore error: $e")));
-  //   }
-  // }
-
   @override
   void dispose() {
     _amountController.dispose();

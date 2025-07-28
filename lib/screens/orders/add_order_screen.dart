@@ -153,11 +153,17 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
           '${_paymentStatus}_${_amountPaid.toInt()}_${cleanedCustomerName}_$formattedDate';
 
       await customerDoc.collection('payments').doc(paymentId).set({
-        'amountPaid': _amountPaid,
-        'status': _paymentStatus,
-        'timestamp': now,
+        'paymentId': paymentId,
+        'customerId': customerDoc.id,
+        'customerName': _selectedCustomer,
+        'amount':
+            _amountPaid, // 👈 This is the correct field name (not amountPaid)
         'totalAmount': _totalAmount,
+        'status': _paymentStatus,
         'note': 'Auto-payment for order $orderId',
+        'receivedBy': _addedBy, // 👈 Replace with actual user ID (string)
+        'receivedTime': now,
+        'timestamp': now, // Optional: Keep for sorting or historical tracking
       });
 
       // Deduct inventory quantity

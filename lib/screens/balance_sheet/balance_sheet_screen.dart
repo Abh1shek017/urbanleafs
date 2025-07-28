@@ -333,14 +333,39 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
             ],
           ),
           SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: _buildSummaryCard(
-              'Due Amounts',
-              '₹${state.dueAmounts.toStringAsFixed(2)} from ${state.dueCustomerCount} Customers',
-              Colors.orange[400]!,
-              () => _showDueCustomersBottomSheet(context),
-            ),
+          Consumer(
+            builder: (context, ref, _) {
+              final dueAsync = ref.watch(allCustomersWithDueProvider);
+
+              return dueAsync.when(
+                loading: () => _buildSummaryCard(
+                  'Due Amounts',
+                  'Loading…',
+                  Colors.orange[400]!,
+                  () => _showDueCustomersBottomSheet(context),
+                ),
+                error: (e, _) => _buildSummaryCard(
+                  'Due Amounts',
+                  'Error',
+                  Colors.orange[400]!,
+                  () => _showDueCustomersBottomSheet(context),
+                ),
+                data: (customers) {
+                  final totalDue = customers.fold<double>(
+                    0,
+                    (sum, c) => sum + c.totalDue,
+                  );
+                  final count = customers.length;
+
+                  return _buildSummaryCard(
+                    'Due Amounts',
+                    '₹${totalDue.toStringAsFixed(2)} from $count Customers',
+                    Colors.orange[400]!,
+                    () => _showDueCustomersBottomSheet(context),
+                  );
+                },
+              );
+            },
           ),
         ],
       ),
@@ -800,37 +825,6 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     }
   }
 
-  // void _showProfitDetails(
-  //     BuildContext context, double sold, double expenses, double profit) {
-  //   _showDataSheet(
-  //     context,
-  //     'Profit Calculation',
-  //     [
-  //       {'sold': sold, 'expenses': expenses, 'profit': profit},
-  //     ],
-  //     (data) {
-  //       return Container(
-  //         decoration: BoxDecoration(
-  //           color: Colors.blue[50],
-  //           borderRadius: BorderRadius.circular(8),
-  //         ),
-  //         margin: const EdgeInsets.symmetric(vertical: 4),
-  //         padding: const EdgeInsets.all(8),
-  //         child: Column(
-  //           crossAxisAlignment: CrossAxisAlignment.start,
-  //           children: [
-  //             Text('Total Sold: ₹${sold.toStringAsFixed(2)}'),
-  //             Text('Total Expenses: ₹${expenses.toStringAsFixed(2)}'),
-  //             const Divider(),
-  //             Text('Total Profit: ₹${profit.toStringAsFixed(2)}',
-  //                 style: const TextStyle(fontWeight: FontWeight.bold)),
-  //           ],
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
-
   void _showDueCustomersBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -933,10 +927,13 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    onTap: () => _showCustomerDetailBottomSheet(
-                                      context,
-                                      customer,
-                                    ),
+                                    onTap: () {
+                                      _showCustomerDetailBottomSheet(
+                                        context,
+                                        customer,
+                                        customer.payments,
+                                      );
+                                    },
                                   ),
                                 );
                               },
@@ -969,15 +966,18 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     }
   }
 
-  void _showCustomerDetailBottomSheet(BuildContext context, dynamic customer) {
+  void _showCustomerDetailBottomSheet(
+    BuildContext context,
+    dynamic customer,
+    List<Map<String, dynamic>> payments,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) {
+      builder: (Context) {
         return DraggableScrollableSheet(
           expand: false,
           builder: (context, scrollController) {
-            // 🔁 These are state variables
             String? selectedYear;
             String? selectedMonth;
             String paymentFilter = 'All';
@@ -998,6 +998,7 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
               'November',
               'December',
             ];
+
             final List<String> paymentStatusOptions = [
               'All',
               'Paid',
@@ -1005,20 +1006,16 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
               'Partially Paid',
             ];
 
-            List<Map<String, dynamic>> allOrders = [
-              ...customer.allOrders,
-            ]; // <- fix here
+            List<Map<String, dynamic>> allOrders = [...customer.allOrders];
             List<Map<String, dynamic>> filteredOrders = [...allOrders];
 
             double totalAmount = 0;
             double totalPaid = 0;
             double totalDue = 0;
 
-            // 🔍 Filters logic
             void applyFilters() {
               filteredOrders = [...customer.allOrders];
 
-              // Date filter
               if (selectedYear != null && selectedMonth != null) {
                 filteredOrders = filteredOrders.where((order) {
                   final orderDate = getOrderTime(order['orderTime']);
@@ -1028,7 +1025,6 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
                 }).toList();
               }
 
-              // Payment status filter
               if (paymentFilter != 'All') {
                 filteredOrders = filteredOrders.where((order) {
                   final status = (order['paymentStatus'] ?? '')
@@ -1037,7 +1033,7 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
                   return status == paymentFilter.toLowerCase();
                 }).toList();
               }
-              // Sorting
+
               filteredOrders.sort((a, b) {
                 final aTime = getOrderTime(a['orderTime']);
                 final bTime = getOrderTime(b['orderTime']);
@@ -1046,257 +1042,374 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
                     : aTime.compareTo(bTime);
               });
 
-              // Totals
               totalAmount = 0;
               totalPaid = 0;
               for (var order in filteredOrders) {
                 totalAmount += (order['totalAmount'] ?? 0).toDouble();
-                totalPaid += (order['amountPaid'] ?? 0).toDouble();
               }
+              totalPaid = payments.fold(
+                0.0,
+                (sum, payment) => sum + ((payment['amount'] ?? 0).toDouble()),
+              );
               totalDue = totalAmount - totalPaid;
             }
 
-            applyFilters(); // Initial calculation
+            applyFilters();
 
             return StatefulBuilder(
               builder: (context, setState) {
-                return SingleChildScrollView(
-                  controller: scrollController,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Profile
-                        Center(
-                          child: customer.profileImageUrl?.isNotEmpty == true
-                              ? CircleAvatar(
-                                  radius: 40,
-                                  backgroundImage: NetworkImage(
-                                    customer.profileImageUrl!,
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 50,
+                              height: 5,
+                              margin: const EdgeInsets.only(top: 12, bottom: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[400],
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+
+                          Center(
+                            child: customer.profileImageUrl?.isNotEmpty == true
+                                ? CircleAvatar(
+                                    radius: 40,
+                                    backgroundImage: NetworkImage(
+                                      customer.profileImageUrl!,
+                                    ),
+                                  )
+                                : const CircleAvatar(
+                                    radius: 40,
+                                    child: Icon(Icons.person, size: 40),
                                   ),
-                                )
-                              : const CircleAvatar(
-                                  radius: 40,
-                                  child: Icon(Icons.person, size: 40),
-                                ),
-                        ),
-                        const SizedBox(height: 8),
-                        Center(
-                          child: Text(
-                            customer.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Phone + Address
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            GestureDetector(
-                              onTap: () async {
-                                final Uri phoneUri = Uri(
-                                  scheme: 'tel',
-                                  path: customer.phone,
-                                );
-                                if (await canLaunchUrl(phoneUri)) {
-                                  await launchUrl(phoneUri);
-                                }
-                              },
-                              child: Text(
-                                "📞 ${customer.phone}",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.blueAccent,
-                                  decoration: TextDecoration.underline,
-                                ),
+                          const SizedBox(height: 8),
+                          Center(
+                            child: Text(
+                              customer.name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Expanded(
-                              child: Text(
-                                "🏠 ${customer.address}",
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.grey,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: () async {
+                                  final Uri phoneUri = Uri(
+                                    scheme: 'tel',
+                                    path: customer.phone,
+                                  );
+                                  if (await canLaunchUrl(phoneUri)) {
+                                    await launchUrl(phoneUri);
+                                  }
+                                },
+                                child: Text(
+                                  "📞 ${customer.phone}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.blueAccent,
+                                    decoration: TextDecoration.underline,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        const Text(
-                          'Orders',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                              Expanded(
+                                child: Text(
+                                  "🏠 ${customer.address}",
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
 
-                        const SizedBox(height: 12),
-
-                        // Filter Row
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            DropdownButton<String>(
-                              hint: const Text("Select Year"),
-                              value: selectedYear,
-                              items: yearOptions.map((year) {
-                                return DropdownMenuItem(
-                                  value: year,
-                                  child: Text(year),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedYear = value;
-                                  selectedMonth = null;
-                                  applyFilters();
-                                });
-                              },
-                            ),
-                            if (selectedYear != null)
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 8,
+                            children: [
                               DropdownButton<String>(
-                                hint: const Text("Select Month"),
-                                value: selectedMonth,
-                                items: monthOptions.map((month) {
+                                hint: const Text("Select Year"),
+                                value: selectedYear,
+                                items: yearOptions.map((year) {
                                   return DropdownMenuItem(
-                                    value: month,
-                                    child: Text(month),
+                                    value: year,
+                                    child: Text(year),
                                   );
                                 }).toList(),
                                 onChanged: (value) {
                                   setState(() {
-                                    selectedMonth = value;
+                                    selectedYear = value;
+                                    selectedMonth = null;
                                     applyFilters();
                                   });
                                 },
                               ),
-                            DropdownButton<String>(
-                              value: sortOption,
-                              items: ['Latest First', 'Oldest First'].map((
-                                option,
-                              ) {
-                                return DropdownMenuItem(
-                                  value: option,
-                                  child: Text(option),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  sortOption = value!;
-                                  applyFilters();
-                                });
-                              },
-                            ),
-                            DropdownButton<String>(
-                              value: paymentFilter,
-                              items: paymentStatusOptions.map((status) {
-                                return DropdownMenuItem(
-                                  value: status,
-                                  child: Text(status),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  paymentFilter = value!;
-                                  applyFilters();
-                                });
-                              },
-                            ),
-                            TextButton.icon(
-                              icon: const Icon(Icons.clear),
-                              label: const Text("Clear Filters"),
-                              onPressed: () {
-                                setState(() {
-                                  selectedYear = null;
-                                  selectedMonth = null;
-                                  paymentFilter = 'All';
-                                  sortOption = 'Latest First';
-                                  applyFilters();
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        // Totals Row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Text(
-                              '🧾 Total: ₹${totalAmount.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              '✅ Paid: ₹${totalPaid.toStringAsFixed(2)}',
-                              style: const TextStyle(color: Colors.green),
-                            ),
-                            Text(
-                              '❌ Due: ₹${totalDue.toStringAsFixed(2)}',
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Orders List
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filteredOrders.length,
-                          itemBuilder: (context, index) {
-                            final order = filteredOrders[index];
-                            final orderTime = getOrderTime(order['orderTime']);
-                            final paid = (order['amountPaid'] ?? 0).toDouble();
-                            final total = (order['totalAmount'] ?? 0)
-                                .toDouble();
-                            final due = total - paid;
-
-                            return Card(
-                              child: ListTile(
-                                title: Text('₹${total.toStringAsFixed(2)}'),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Paid: ₹${paid.toStringAsFixed(2)}'),
-                                    Text('Due: ₹${due.toStringAsFixed(2)}'),
-                                    Text(
-                                      DateFormat(
-                                        'dd MMM yyyy',
-                                      ).format(orderTime),
-                                    ),
-                                    Text(
-                                      'Status: ${order['paymentStatus'] ?? 'Unknown'}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ],
+                              if (selectedYear != null)
+                                DropdownButton<String>(
+                                  hint: const Text("Select Month"),
+                                  value: selectedMonth,
+                                  items: monthOptions.map((month) {
+                                    return DropdownMenuItem(
+                                      value: month,
+                                      child: Text(month),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedMonth = value;
+                                      applyFilters();
+                                    });
+                                  },
                                 ),
-                                onTap: () {
-                                  // TODO: Open order detail if needed
+                              DropdownButton<String>(
+                                value: sortOption,
+                                items: ['Latest First', 'Oldest First'].map((
+                                  option,
+                                ) {
+                                  return DropdownMenuItem(
+                                    value: option,
+                                    child: Text(option),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    sortOption = value!;
+                                    applyFilters();
+                                  });
                                 },
                               ),
-                            );
-                          },
-                        ),
-                      ],
+                              DropdownButton<String>(
+                                value: paymentFilter,
+                                items: paymentStatusOptions.map((status) {
+                                  return DropdownMenuItem(
+                                    value: status,
+                                    child: Text(status),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    paymentFilter = value!;
+                                    applyFilters();
+                                  });
+                                },
+                              ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.clear),
+                                label: const Text("Clear Filters"),
+                                onPressed: () {
+                                  setState(() {
+                                    selectedYear = null;
+                                    selectedMonth = null;
+                                    paymentFilter = 'All';
+                                    sortOption = 'Latest First';
+                                    applyFilters();
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.spaceAround,
+                            children: [
+                              Text(
+                                '🧾 Total: ₹${totalAmount.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '✅ Paid: ₹${totalPaid.toStringAsFixed(2)}',
+                                style: const TextStyle(color: Colors.green),
+                              ),
+                              Text(
+                                '❌ Due: ₹${totalDue.toStringAsFixed(2)}',
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
                     ),
-                  ),
+                    Expanded(
+                      child: DefaultTabController(
+                        length: 2,
+                        child: Column(
+                          children: [
+                            const TabBar(
+                              labelColor: Colors.blue,
+                              unselectedLabelColor: Colors.grey,
+                              indicatorColor: Colors.blue,
+                              tabs: [
+                                Tab(text: 'Orders'),
+                                Tab(text: 'Payments'),
+                              ],
+                            ),
+                            Expanded(
+                              child: TabBarView(
+                                children: [
+                                  ListView.builder(
+                                    controller: scrollController,
+                                    itemCount: filteredOrders.length,
+                                    itemBuilder: (context, index) {
+                                      final order = filteredOrders[index];
+                                      final orderTime = getOrderTime(
+                                        order['orderTime'],
+                                      );
+                                      final paid = (order['amountPaid'] ?? 0)
+                                          .toDouble();
+                                      final total = (order['totalAmount'] ?? 0)
+                                          .toDouble();
+                                      final due = total - paid;
+                                      return Card(
+                                        child: ListTile(
+                                          title: Text(
+                                            '₹${total.toStringAsFixed(2)}',
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Paid: ₹${paid.toStringAsFixed(2)}',
+                                              ),
+                                              Text(
+                                                'Due: ₹${due.toStringAsFixed(2)}',
+                                              ),
+                                              Text(
+                                                DateFormat(
+                                                  'dd MMM yyyy',
+                                                ).format(orderTime),
+                                              ),
+                                              Text(
+                                                'Status: ${order['paymentStatus'] ?? 'Unknown'}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+
+                                  payments.isEmpty
+                                      ? const Center(
+                                          child: Text('No payments found.'),
+                                        )
+                                      : (() {
+                                          payments.sort((a, b) {
+                                            final tsA =
+                                                a['receivedTime'] ??
+                                                a['timestamp'];
+                                            final tsB =
+                                                b['receivedTime'] ??
+                                                b['timestamp'];
+
+                                            final dateA = tsA is Timestamp
+                                                ? tsA.toDate()
+                                                : (tsA is DateTime
+                                                      ? tsA
+                                                      : DateTime.now());
+                                            final dateB = tsB is Timestamp
+                                                ? tsB.toDate()
+                                                : (tsB is DateTime
+                                                      ? tsB
+                                                      : DateTime.now());
+
+                                            return dateB.compareTo(
+                                              dateA,
+                                            ); // Descending order
+                                          });
+
+                                          return ListView.builder(
+                                            controller: scrollController,
+                                            itemCount: payments.length,
+                                            itemBuilder: (context, index) {
+                                              final payment = payments[index];
+                                              final amount =
+                                                  (payment['amount'] ?? 0)
+                                                      .toDouble();
+                                              final note = payment['note'];
+                                              final receiver =
+                                                  payment['receivedBy'] ??
+                                                  'Unknown';
+                                              final timestamp =
+                                                  payment['receivedTime'] ??
+                                                  payment['timestamp'];
+                                              final receivedTime =
+                                                  timestamp is Timestamp
+                                                  ? timestamp.toDate()
+                                                  : (timestamp is DateTime
+                                                        ? timestamp
+                                                        : DateTime.now());
+                                              final isAutoPayment =
+                                                  note != null &&
+                                                  note.toString().isNotEmpty;
+
+                                              return Card(
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    isAutoPayment
+                                                        ? Icons.flash_on
+                                                        : Icons.payments,
+                                                    color: isAutoPayment
+                                                        ? Colors.orange
+                                                        : Colors.blue,
+                                                  ),
+                                                  title: Text(
+                                                    '₹${amount.toStringAsFixed(2)}',
+                                                  ),
+                                                  subtitle: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        'Received by: $receiver',
+                                                      ),
+                                                      Text(
+                                                        isAutoPayment
+                                                            ? 'Note: $note'
+                                                            : 'Manual payment',
+                                                      ),
+                                                      Text(
+                                                        'Date: ${DateFormat('dd MMM yyyy – hh:mm a').format(receivedTime)}',
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          );
+                                        })(),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             );
