@@ -13,7 +13,8 @@ import '../../utils/notifications_util.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 // import '../../utils/format_utils.dart';
-import 'package:intl/intl.dart';  
+import 'package:intl/intl.dart';
+
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({Key? key}) : super(key: key);
 
@@ -62,13 +63,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     for (var id in _selectedIds) {
       // example: set quantity = lowStockThreshold * 2
       final asyncList = ref.read(inventoryStreamProvider);
-final items = asyncList.when(
-  data: (list) => list,
-  loading: () => [],
-  error: (_, __) => [],
-);
+      final items = asyncList.when(
+        data: (list) => list,
+        loading: () => [],
+        error: (_, __) => [],
+      );
 
-final item = items.firstWhere((i) => i.id == id);
+      final item = items.firstWhere((i) => i.id == id);
 
       InventoryRepository().updateInventory(id, {
         'quantity': item.lowStockThreshold * 2,
@@ -92,46 +93,66 @@ final item = items.firstWhere((i) => i.id == id);
             : Text('${_selectedIds.length} selected'),
         actions: _selectedIds.isEmpty
             ? [
-                IconButton(icon: const Icon(Icons.filter_list), onPressed: _showSortFilterDialog),
-                IconButton(icon: const Icon(Icons.search), onPressed: _showSearchDialog),
+                IconButton(
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: _showSortFilterDialog,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: _showSearchDialog,
+                ),
               ]
             : [
-                IconButton(icon: const Icon(Icons.restore), onPressed: _applyBatchRestock),
+                IconButton(
+                  icon: const Icon(Icons.restore),
+                  onPressed: _applyBatchRestock,
+                ),
                 // IconButton(icon: const Icon(Icons.delete), onPressed: _applyBatchDelete),
               ],
       ),
       body: _loadingMaster
           ? _buildShimmerGrid()
           : _errorMaster != null
-              ? _buildErrorState(_errorMaster!, _loadMasterData)
-              : inventoryAsync.when(
-                  loading: _buildShimmerGrid,
-                  error: (e, _) => _buildErrorState(e.toString(), () => ref.invalidate(inventoryStreamProvider)),
-                  data: (items) => _buildContent(context, items, authUser!.uid),
-                ),
+          ? _buildErrorState(_errorMaster!, _loadMasterData)
+          : inventoryAsync.when(
+              loading: _buildShimmerGrid,
+              error: (e, _) => _buildErrorState(
+                e.toString(),
+                () => ref.invalidate(inventoryStreamProvider),
+              ),
+              data: (items) => _buildContent(context, items, authUser!.uid),
+            ),
       floatingActionButton: _selectedIds.isEmpty
-    ? FloatingActionButton.extended(
-        onPressed: () => _showAddInventorySheet(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Item'),
-      )
-    : null,
-
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddInventorySheet(context),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Item'),
+            )
+          : null,
     );
   }
-void _showAddInventorySheet(BuildContext context) {
-  showModalBottomSheet(
-    isScrollControlled: true,
-    context: context,
-    builder: (ctx) => const AddInventoryBottomSheet(),
-  );
-}
 
-  Widget _buildContent(BuildContext context, List<InventoryModel> items, String userId) {
+  void _showAddInventorySheet(BuildContext context) {
+    showModalBottomSheet(
+      isScrollControlled: true,
+      context: context,
+      builder: (ctx) => const AddInventoryBottomSheet(),
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    List<InventoryModel> items,
+    String userId,
+  ) {
     // Apply search/filter/sort
-    var filtered = items.where((i) => i.itemName.toLowerCase().contains(_searchQuery.toLowerCase()));
-    if (_filterType != 'all') filtered = filtered.where((i) => i.type == _filterType);
-    if (_lowStockOnly) filtered = filtered.where((i) => i.quantity < i.lowStockThreshold);
+    var filtered = items.where(
+      (i) => i.itemName.toLowerCase().contains(_searchQuery.toLowerCase()),
+    );
+    if (_filterType != 'all')
+      filtered = filtered.where((i) => i.type == _filterType);
+    if (_lowStockOnly)
+      filtered = filtered.where((i) => i.quantity < i.lowStockThreshold);
     final sorted = filtered.toList()
       ..sort((a, b) {
         switch (_sortBy) {
@@ -157,117 +178,137 @@ void _showAddInventorySheet(BuildContext context) {
       );
     }
 
-    return LayoutBuilder(builder: (ctx, constraints) {
-      final maxWidth = constraints.maxWidth;
-      final crossAxisCount = (maxWidth / 200).clamp(2, 4).toInt();
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final crossAxisCount = (maxWidth / 200).clamp(2, 4).toInt();
 
-      return GridView.builder(
-        padding: const EdgeInsets.all(12),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 3 / 2,
-        ),
-        itemCount: sorted.length,
-        itemBuilder: (ctx, idx) {
-          final item = sorted[idx];
-          final isLow = item.quantity < item.lowStockThreshold;
-          final isSelected = _selectedIds.contains(item.id);
-          final stripeColor = item.quantity == 0
-              ? Colors.grey
-              : isLow
-                  ? Colors.red
-                  : (item.type == 'raw' ? Colors.green : Colors.blue);
+        return GridView.builder(
+          padding: const EdgeInsets.all(12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 4/3.5,
+          ),
+          itemCount: sorted.length,
+          itemBuilder: (ctx, idx) {
+            final item = sorted[idx];
+            final isLow = item.quantity < item.lowStockThreshold;
+            final isSelected = _selectedIds.contains(item.id);
+            final stripeColor = item.quantity == 0
+                ? Colors.grey
+                : isLow
+                ? Colors.red
+                : (item.type == 'raw' ? Colors.green : Colors.blue);
 
-          return GestureDetector(
-            onLongPress: () => setState(() {
-              isSelected ? _selectedIds.remove(item.id) : _selectedIds.add(item.id);
-            }),
-            onTap: () {
-              if (_selectedIds.isNotEmpty) {
-                setState(() {
-                  isSelected ? _selectedIds.remove(item.id) : _selectedIds.add(item.id);
-                });
-              } else {
-                _showDetailSheet(ctx, item);
-              }
-            },
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
-              opacity: isSelected ? 0.6 : 1,
-              child: Slidable(
-                key: ValueKey(item.id),
-                endActionPane: ActionPane(
-                  extentRatio: 0.4,
-                  motion: const DrawerMotion(),
-                  children: [
-                    SlidableAction(
-                      onPressed: (_) => _restockItem(item),
-                      icon: Icons.restore,
-                      label: 'Restock',
-                      backgroundColor: Colors.green,
-                    ),
-                    // SlidableAction(
-                    //   onPressed: (_) => InventoryRepository().deleteInventory(item.id),
-                    //   icon: Icons.delete,
-                    //   label: 'Delete',
-                    //   backgroundColor: Colors.red,
-                    // ),
-                  ],
-                ),
-                child: Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Stack(
+            return GestureDetector(
+              onLongPress: () => setState(() {
+                isSelected
+                    ? _selectedIds.remove(item.id)
+                    : _selectedIds.add(item.id);
+              }),
+              onTap: () {
+                if (_selectedIds.isNotEmpty) {
+                  setState(() {
+                    isSelected
+                        ? _selectedIds.remove(item.id)
+                        : _selectedIds.add(item.id);
+                  });
+                } else {
+                  _showDetailSheet(ctx, item);
+                }
+              },
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: isSelected ? 0.6 : 1,
+                child: Slidable(
+                  key: ValueKey(item.id),
+                  endActionPane: ActionPane(
+                    extentRatio: 0.4,
+                    motion: const DrawerMotion(),
                     children: [
-                      // left stripe
-                      Positioned.fill(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(width: 4, color: stripeColor),
-                        ),
+                      SlidableAction(
+                        onPressed: (_) => _restockItem(item),
+                        icon: Icons.restore,
+                        label: 'Restock',
+                        backgroundColor: Colors.green,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // header + badge
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(item.itemName,
-                                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                                Icon(
-                                  isLow
-                                      ? Icons.warning_amber_rounded
-                                      : Icons.check_circle_outline,
-                                  color: isLow ? Colors.red : Colors.green,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text('Qty: ${item.quantity} ${item.unit}'),
-                            Text('Type: ${item.type.toUpperCase()}'),
-                            const Spacer(),
-                            Text(
-                              'Restocked: ${DateFormat.yMMMd().format(item.lastUpdated)}',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
+                      // SlidableAction(
+                      //   onPressed: (_) => InventoryRepository().deleteInventory(item.id),
+                      //   icon: Icons.delete,
+                      //   label: 'Delete',
+                      //   backgroundColor: Colors.red,
+                      // ),
                     ],
+                  ),
+                  child: Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Stack(
+                      children: [
+                        // left stripe
+                        Positioned.fill(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(width: 4, color: stripeColor),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // header + badge
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.itemName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                  Icon(
+                                    isLow
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.check_circle_outline,
+                                    color: isLow ? Colors.red : Colors.green,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 7),
+                              Text('Qty: ${item.quantity} ${item.unit}'),
+                              Text(
+                                'Type: ${item.type.toUpperCase()}',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              const Spacer(),
+                              Text(
+                                'Restocked: ${DateFormat.yMMMd().format(item.lastUpdated)}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
-      );
-    });
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildShimmerGrid() {
@@ -277,24 +318,32 @@ void _showAddInventorySheet(BuildContext context) {
         maxCrossAxisExtent: 200,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 3 / 2,
+        childAspectRatio: 1,
       ),
       itemCount: 8,
       itemBuilder: (_, __) => Shimmer.fromColors(
         baseColor: Colors.grey.shade300,
         highlightColor: Colors.grey.shade100,
-        child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12))),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildErrorState(String message, VoidCallback retry) {
     return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text('Error: $message'),
-        const SizedBox(height: 12),
-        ElevatedButton(onPressed: retry, child: const Text('Retry')),
-      ]),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Error: $message'),
+          const SizedBox(height: 12),
+          ElevatedButton(onPressed: retry, child: const Text('Retry')),
+        ],
+      ),
     );
   }
 
@@ -308,86 +357,100 @@ void _showAddInventorySheet(BuildContext context) {
           decoration: const InputDecoration(hintText: 'Item name…'),
           onChanged: (v) => setState(() => _searchQuery = v),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
-void _showSortFilterDialog() {
-  showModalBottomSheet(
-    context: context,
-    builder: (_) => StatefulBuilder(
-      builder: (context, setModalState) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<String>(
-              value: _filterType,
-              decoration: const InputDecoration(labelText: 'Filter by Type'),
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('All')),
-                DropdownMenuItem(value: 'RAW MATERIAL', child: Text('Raw Material')),
-                DropdownMenuItem(value: 'PREPARED', child: Text('Prepared')),
-              ],
-              onChanged: (v) {
-                setState(() => _filterType = v!);
-                setModalState(() {});
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Low-stock only'),
-              value: _lowStockOnly,
-              onChanged: (v) {
-                setState(() => _lowStockOnly = v);
-                setModalState(() {});
-              },
-            ),
-            DropdownButtonFormField<String>(
-              value: _sortBy,
-              decoration: const InputDecoration(labelText: 'Sort by'),
-              items: const [
-                DropdownMenuItem(value: 'name', child: Text('Name')),
-                DropdownMenuItem(value: 'qty', child: Text('Quantity')),
-                DropdownMenuItem(value: 'date', child: Text('Last Restocked')),
-              ],
-              onChanged: (v) {
-                setState(() => _sortBy = v!);
-                setModalState(() {});
-              },
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _filterType = 'all';
-                        _lowStockOnly = false;
-                        _sortBy = 'name';
-                      });
-                      Navigator.pop(context);
-                    },
-                    icon: const Icon(Icons.clear),
-                    label: const Text('Clear Filters'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+
+  void _showSortFilterDialog() {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: _filterType,
+                decoration: const InputDecoration(labelText: 'Filter by Type'),
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('All')),
+                  DropdownMenuItem(
+                    value: 'RAW MATERIAL',
+                    child: Text('Raw Material'),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Close'),
+                  DropdownMenuItem(value: 'Prepared', child: Text('Prepared')),
+                ],
+                onChanged: (v) {
+                  setState(() => _filterType = v!);
+                  setModalState(() {});
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Low-stock only'),
+                value: _lowStockOnly,
+                onChanged: (v) {
+                  setState(() => _lowStockOnly = v);
+                  setModalState(() {});
+                },
+              ),
+              DropdownButtonFormField<String>(
+                value: _sortBy,
+                decoration: const InputDecoration(labelText: 'Sort by'),
+                items: const [
+                  DropdownMenuItem(value: 'name', child: Text('Name')),
+                  DropdownMenuItem(value: 'qty', child: Text('Quantity')),
+                  DropdownMenuItem(
+                    value: 'date',
+                    child: Text('Last Restocked'),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+                onChanged: (v) {
+                  setState(() => _sortBy = v!);
+                  setModalState(() {});
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _filterType = 'all';
+                          _lowStockOnly = false;
+                          _sortBy = 'name';
+                        });
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.clear),
+                      label: const Text('Clear Filters'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _restockItem(InventoryModel item) {
     final userId = ref.read(authStateProvider).value!.uid;
@@ -400,123 +463,136 @@ void _showSortFilterDialog() {
   }
 
   void _showDetailSheet(BuildContext ctx, InventoryModel item) {
-  showModalBottomSheet(
-    context: ctx,
-    isScrollControlled: true,
-    builder: (_) => Consumer(
-      builder: (context, ref, _) {
-        final userNameAsync = ref.watch(userNameByIdProvider(item.updatedBy));
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      builder: (_) => Consumer(
+        builder: (context, ref, _) {
+          final userNameAsync = ref.watch(userNameByIdProvider(item.updatedBy));
 
-        return Padding(
-          padding: MediaQuery.of(ctx).viewInsets,
-          child: DraggableScrollableSheet(
-            expand: false,
-            builder: (_, ctrl) => ListView(
-              controller: ctrl,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              children: [
-                // Header
-                Text(
-                  item.itemName,
-                  style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+          return Padding(
+            padding: MediaQuery.of(ctx).viewInsets,
+            child: DraggableScrollableSheet(
+              expand: false,
+              builder: (_, ctrl) => ListView(
+                controller: ctrl,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'ID: ${item.id}',
-                  style: Theme.of(ctx).textTheme.bodyMedium,
-                ),
-                const Divider(height: 32),
-
-                // Quantity & Type
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(children: [
-                      const Icon(Icons.storage_outlined, size: 20),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${item.quantity} ${item.unit}',
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ]),
-                    Row(children: [
-                      const Icon(Icons.category_outlined, size: 20),
-                      const SizedBox(width: 6),
-                      Text(
-                        item.type.toUpperCase(),
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ]),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Low-stock threshold
-                Row(children: [
-                  const Icon(Icons.warning_amber_outlined, size: 20),
-                  const SizedBox(width: 6),
+                children: [
+                  // Header
                   Text(
-                    'Reorder at ≤ ${item.lowStockThreshold}',
+                    item.itemName,
+                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'ID: ${item.id}',
                     style: Theme.of(ctx).textTheme.bodyMedium,
                   ),
-                ]),
-                const SizedBox(height: 16),
+                  const Divider(height: 32),
 
-                // Last updated
-                Row(children: [
-                  const Icon(Icons.update, size: 20),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Last restocked: ${DateFormat.yMMMd().format(item.lastUpdated)}',
-                    style: Theme.of(ctx).textTheme.bodyMedium,
+                  // Quantity & Type
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.storage_outlined, size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${item.quantity} ${item.unit}',
+                            style: Theme.of(ctx).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.category_outlined, size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            item.type.toUpperCase(),
+                            style: Theme.of(ctx).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ]),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Updated by
-                Row(children: [
-                  const Icon(Icons.person_outline, size: 20),
-                  const SizedBox(width: 6),
-                  userNameAsync.when(
-                    data: (name) => Text(
-                      'Updated by: $name',
-                      style: Theme.of(ctx).textTheme.bodyMedium,
-                    ),
-                    loading: () => Text(
-                      'Updated by: …',
-                      style: Theme.of(ctx).textTheme.bodyMedium,
-                    ),
-                    error: (_, __) => Text(
-                      'Updated by: Unknown',
-                      style: Theme.of(ctx).textTheme.bodyMedium,
+                  // Low-stock threshold
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_outlined, size: 20),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Reorder at ≤ ${item.lowStockThreshold}',
+                        style: Theme.of(ctx).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Last updated
+                  Row(
+                    children: [
+                      const Icon(Icons.update, size: 20),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Last restocked: ${DateFormat.yMMMd().format(item.lastUpdated)}',
+                        style: Theme.of(ctx).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Updated by
+                  Row(
+                    children: [
+                      const Icon(Icons.person_outline, size: 20),
+                      const SizedBox(width: 6),
+                      userNameAsync.when(
+                        data: (name) => Text(
+                          'Updated by: $name',
+                          style: Theme.of(ctx).textTheme.bodyMedium,
+                        ),
+                        loading: () => Text(
+                          'Updated by: …',
+                          style: Theme.of(ctx).textTheme.bodyMedium,
+                        ),
+                        error: (_, __) => Text(
+                          'Updated by: Unknown',
+                          style: Theme.of(ctx).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const Divider(height: 32),
+
+                  // Placeholder for history or extra details
+                  Center(
+                    child: Text(
+                      '— Usage & Restock History —',
+                      style: Theme.of(ctx).textTheme.titleMedium,
                     ),
                   ),
-                ]),
-
-                const Divider(height: 32),
-
-                // Placeholder for history or extra details
-                Center(
-                  child: Text(
-                    '— Usage & Restock History —',
-                    style: Theme.of(ctx).textTheme.titleMedium,
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Here you can show a small chart or list of past stock changes. '
+                    'For example, last 5 restocks with date & added quantity.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontStyle: FontStyle.italic),
                   ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Here you can show a small chart or list of past stock changes. '
-                  'For example, last 5 restocks with date & added quantity.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontStyle: FontStyle.italic),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    ),
-  );
-}
+          );
+        },
+      ),
+    );
+  }
 }
