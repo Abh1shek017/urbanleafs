@@ -5,6 +5,7 @@ import '../../providers/attendance_summary_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../models/attendance_model.dart';
+
 class AttendanceScreen extends ConsumerStatefulWidget {
   const AttendanceScreen({super.key});
 
@@ -15,31 +16,48 @@ class AttendanceScreen extends ConsumerStatefulWidget {
 class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
   int selectedMonth = DateTime.now().month;
   int selectedYear = DateTime.now().year;
-@override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final notifier = ref.read(attendanceSummaryStateProvider.notifier);
-    final now = DateTime.now();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final notifier = ref.read(attendanceSummaryStateProvider.notifier);
+      final now = DateTime.now();
 
-    // Reset the selected month/year to current
-    notifier.setFilter(now.month, now.year);
+      // Reset the selected month/year to current
+      notifier.setFilter(now.month, now.year);
 
-    // Reload data for current month/year
-    notifier.loadSummaries();
-  });
-}
+      // Reload data for current month/year
+      notifier.loadSummaries();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(attendanceSummaryStateProvider);
     final workerList = state.workers;
     final totalWorkers = workerList.length;
-    final totalPresent = workerList.fold<int>(
-      0,
-      (sum, w) => sum + w.presentDays,
-    );
-    final totalAbsent = workerList.fold<int>(0, (sum, w) => sum + w.absentDays);
+    int morningPresent = 0;
+    int morningAbsent = 0;
+    int afternoonPresent = 0;
+    int afternoonAbsent = 0;
+
+    for (final worker in workerList) {
+      for (final record in worker.attendanceHistory) {
+        if (record.shift.toLowerCase() == 'morning') {
+          if (record.status.toLowerCase() == 'present') {
+            morningPresent++;
+          } else {
+            morningAbsent++;
+          }
+        } else if (record.shift.toLowerCase() == 'afternoon') {
+          if (record.status.toLowerCase() == 'present') {
+            afternoonPresent++;
+          } else {
+            afternoonAbsent++;
+          }
+        }
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -76,352 +94,387 @@ void initState() {
                 ),
 
                 // ✅ This scrolls: SummaryCard + Worker List
-               Expanded(
-  child: RefreshIndicator(
-    onRefresh: () async {
-      final notifier = ref.read(attendanceSummaryStateProvider.notifier);
-      await notifier.loadSummaries(); // ✅ Await data reload
-    },
-    child: ListView(
-      padding: const EdgeInsets.only(bottom: 16),
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: SummaryCard(
-            totalWorkers: totalWorkers,
-            morningPresent: totalPresent,
-            morningAbsent: totalAbsent,
-            afternoonPresent: totalPresent,
-            afternoonAbsent: totalAbsent,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ...workerList.map((worker) {
-          return WorkerCard(
-            worker: worker,
-            onTap: () => _showWorkerDetailSheet(
-              context,
-              worker,
-              selectedMonth,
-              selectedYear,
-            ),
-          );
-        }).toList(),
-      ],
-    ),
-  ),
-),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(
+                        attendanceSummaryStateProvider,
+                      ); // ✅ Reset and reload
+                    },
 
-
+                    child: ListView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: SummaryCard(
+                            totalWorkers: totalWorkers,
+                            morningPresent: morningPresent,
+                            morningAbsent: morningAbsent,
+                            afternoonPresent: afternoonPresent,
+                            afternoonAbsent: afternoonAbsent,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ...workerList.map((worker) {
+                          return WorkerCard(
+                            worker: worker,
+                            onTap: () => _showWorkerDetailSheet(
+                              context,
+                              worker,
+                              selectedMonth,
+                              selectedYear,
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
     );
   }
-void _showWorkerDetailSheet(
-  BuildContext context,
-  WorkerSummaryModel worker,
-  int selectedMonth,
-  int selectedYear,
-) {
-  final now = DateTime.now();
 
-  final events = <DateTime, List<String>>{};
-  final Map<DateTime, List<String>> shiftMap = {};
+  void _showWorkerDetailSheet(
+    BuildContext context,
+    WorkerSummaryModel worker,
+    int selectedMonth,
+    int selectedYear,
+  ) {
+    final now = DateTime.now();
 
-  // Compute statuses (including half-day logic)
-  for (final record in worker.attendanceHistory) {
-    final date = DateTime(record.date.year, record.date.month, record.date.day);
-    shiftMap.putIfAbsent(date, () => []).add(record.shift);
-  }
+    final events = <DateTime, List<String>>{};
+    final Map<DateTime, List<String>> shiftMap = {};
 
-  for (final entry in shiftMap.entries) {
-    final date = entry.key;
-    final shifts = entry.value;
-
-    final dayRecords = worker.attendanceHistory.where((rec) =>
-      rec.date.year == date.year &&
-      rec.date.month == date.month &&
-      rec.date.day == date.day).toList();
-
-    if (shifts.length == 1 && dayRecords.any((r) => r.status.toLowerCase() == 'present')) {
-      events[date] = ['half-day'];
-    } else if (dayRecords.every((r) => r.status.toLowerCase() == 'absent')) {
-      events[date] = ['absent'];
-    } else if (dayRecords.every((r) => r.status.toLowerCase() == 'present')) {
-      events[date] = ['present'];
-    } else {
-      // Mixed present and absent — treat as half-day for simplicity
-      events[date] = ['half-day'];
+    // Compute statuses (including half-day logic)
+    for (final record in worker.attendanceHistory) {
+      final date = DateTime(
+        record.date.year,
+        record.date.month,
+        record.date.day,
+      );
+      shiftMap.putIfAbsent(date, () => []).add(record.shift);
     }
-  }
 
-  DateTime displayedMonth = DateTime(selectedYear, selectedMonth);
+    for (final entry in shiftMap.entries) {
+      final date = entry.key;
+      final shifts = entry.value;
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => DraggableScrollableSheet(
-      expand: false,
-      builder: (context, scrollController) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return SingleChildScrollView(
-              controller: scrollController,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Avatar
-                    Center(
-                      child: worker.worker.imageUrl.isNotEmpty
-                          ? CircleAvatar(
-                              radius: 40,
-                              backgroundColor: Colors.green,
-                              backgroundImage: NetworkImage(worker.worker.imageUrl),
-                              onBackgroundImageError: (_, __) {},
-                            )
-                          : const CircleAvatar(
-                              radius: 40,
-                              backgroundColor: Colors.green,
-                              child: Icon(Icons.person, size: 40, color: Colors.white),
-                            ),
-                    ),
+      final dayRecords = worker.attendanceHistory
+          .where(
+            (rec) =>
+                rec.date.year == date.year &&
+                rec.date.month == date.month &&
+                rec.date.day == date.day,
+          )
+          .toList();
 
-                    const SizedBox(height: 8),
+      if (shifts.length == 1 &&
+          dayRecords.any((r) => r.status.toLowerCase() == 'present')) {
+        events[date] = ['half-day'];
+      } else if (dayRecords.every((r) => r.status.toLowerCase() == 'absent')) {
+        events[date] = ['absent'];
+      } else if (dayRecords.every((r) => r.status.toLowerCase() == 'present')) {
+        events[date] = ['present'];
+      } else {
+        // Mixed present and absent — treat as half-day for simplicity
+        events[date] = ['half-day'];
+      }
+    }
 
-                    // Name
-                    Center(
-                      child: Text(
-                        worker.worker.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+    DateTime displayedMonth = DateTime(selectedYear, selectedMonth);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        builder: (context, scrollController) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return SingleChildScrollView(
+                controller: scrollController,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Avatar
+                      Center(
+                        child: worker.worker.imageUrl.isNotEmpty
+                            ? CircleAvatar(
+                                radius: 40,
+                                backgroundColor: Colors.green,
+                                backgroundImage: NetworkImage(
+                                  worker.worker.imageUrl,
+                                ),
+                                onBackgroundImageError: (_, __) {},
+                              )
+                            : const CircleAvatar(
+                                radius: 40,
+                                backgroundColor: Colors.green,
+                                child: Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
-                    ),
 
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 8),
 
-                    // Phone + Address in same row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            final Uri phoneUri = Uri(scheme: 'tel', path: worker.worker.phone);
-                            if (await canLaunchUrl(phoneUri)) {
-                              await launchUrl(phoneUri);
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Could not launch phone dialer')),
-                              );
-                            }
-                          },
-                          child: Text(
-                            "📞 ${worker.worker.phone}",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.blueAccent,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            "🏠 ${worker.worker.address}",
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Month Navigation
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_left),
-                          onPressed: () {
-                            setState(() {
-                              displayedMonth = DateTime(
-                                displayedMonth.year,
-                                displayedMonth.month - 1,
-                              );
-                            });
-                          },
-                        ),
-                        Text(
-                          "${_monthName(displayedMonth.month)} ${displayedMonth.year}",
+                      // Name
+                      Center(
+                        child: Text(
+                          worker.worker.name,
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.arrow_right),
-                          onPressed: () {
-                            final nextMonth = DateTime(
-                              displayedMonth.year,
-                              displayedMonth.month + 1,
-                            );
-                            if (nextMonth.isBefore(DateTime(now.year, now.month + 1))) {
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Phone + Address in same row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              final Uri phoneUri = Uri(
+                                scheme: 'tel',
+                                path: worker.worker.phone,
+                              );
+                              if (await canLaunchUrl(phoneUri)) {
+                                await launchUrl(phoneUri);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Could not launch phone dialer',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Text(
+                              "📞 ${worker.worker.phone}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.blueAccent,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              "🏠 ${worker.worker.address}",
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Month Navigation
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_left),
+                            onPressed: () {
                               setState(() {
-                                displayedMonth = nextMonth;
+                                displayedMonth = DateTime(
+                                  displayedMonth.year,
+                                  displayedMonth.month - 1,
+                                );
                               });
+                            },
+                          ),
+                          Text(
+                            "${_monthName(displayedMonth.month)} ${displayedMonth.year}",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.arrow_right),
+                            onPressed: () {
+                              final nextMonth = DateTime(
+                                displayedMonth.year,
+                                displayedMonth.month + 1,
+                              );
+                              if (nextMonth.isBefore(
+                                DateTime(now.year, now.month + 1),
+                              )) {
+                                setState(() {
+                                  displayedMonth = nextMonth;
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Calendar
+                      TableCalendar(
+                        focusedDay: displayedMonth,
+                        firstDay: DateTime(2020),
+                        lastDay: DateTime(now.year, now.month, 31),
+                        calendarFormat: CalendarFormat.month,
+                        availableGestures: AvailableGestures.none,
+                        headerVisible: false,
+                        daysOfWeekVisible: true,
+                        startingDayOfWeek: StartingDayOfWeek.sunday,
+                        calendarStyle: const CalendarStyle(
+                          isTodayHighlighted: true,
+                          outsideDaysVisible: false,
+                          defaultTextStyle: TextStyle(color: Colors.black),
+                          weekendTextStyle: TextStyle(color: Colors.black),
+                          markersMaxCount: 1,
+                        ),
+                        calendarBuilders: CalendarBuilders(
+                          defaultBuilder: (context, day, _) {
+                            final isInMonth = day.month == displayedMonth.month;
+                            final statusList =
+                                events[DateTime(day.year, day.month, day.day)];
+                            final isToday =
+                                day.year == now.year &&
+                                day.month == now.month &&
+                                day.day == now.day;
+
+                            if (!isInMonth) return const SizedBox.shrink();
+
+                            Color? outerColor;
+                            if (statusList != null && statusList.isNotEmpty) {
+                              final status = statusList.first;
+                              if (status == 'present') {
+                                outerColor = Colors.green;
+                              } else if (status == 'absent') {
+                                outerColor = Colors.red;
+                              } else if (status == 'half-day') {
+                                outerColor = Colors.orange;
+                              }
                             }
+
+                            return Center(
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  if (outerColor != null)
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: outerColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  if (isToday)
+                                    Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.grey,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  Text(
+                                    '${day.day}',
+                                    style: TextStyle(
+                                      color: outerColor != null
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
                           },
                         ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // Calendar
-                    TableCalendar(
-                      focusedDay: displayedMonth,
-                      firstDay: DateTime(2020),
-                      lastDay: DateTime(now.year, now.month, 31),
-                      calendarFormat: CalendarFormat.month,
-                      availableGestures: AvailableGestures.none,
-                      headerVisible: false,
-                      daysOfWeekVisible: true,
-                      startingDayOfWeek: StartingDayOfWeek.sunday,
-                      calendarStyle: const CalendarStyle(
-                        isTodayHighlighted: true,
-                        outsideDaysVisible: false,
-                        defaultTextStyle: TextStyle(color: Colors.black),
-                        weekendTextStyle: TextStyle(color: Colors.black),
-                        markersMaxCount: 1,
                       ),
-                      calendarBuilders: CalendarBuilders(
-                        defaultBuilder: (context, day, _) {
-                          final isInMonth = day.month == displayedMonth.month;
-                          final statusList = events[DateTime(day.year, day.month, day.day)];
-                          final isToday = day.year == now.year &&
-                              day.month == now.month &&
-                              day.day == now.day;
 
-                          if (!isInMonth) return const SizedBox.shrink();
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Attendance History",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
 
-                          Color? outerColor;
-                          if (statusList != null && statusList.isNotEmpty) {
-                            final status = statusList.first;
-                            if (status == 'present') {
-                              outerColor = Colors.green;
-                            } else if (status == 'absent') {
-                              outerColor = Colors.red;
-                            } else if (status == 'half-day') {
-                              outerColor = Colors.orange;
-                            }
-                          }
+                      // Filter and sort attendance
+                      Builder(
+                        builder: (context) {
+                          final filteredHistory = List<AttendanceModel>.from(
+                            worker.attendanceHistory.where(
+                              (att) =>
+                                  att.date.month == displayedMonth.month &&
+                                  att.date.year == displayedMonth.year,
+                            ),
+                          );
+                          filteredHistory.sort(
+                            (a, b) => b.date.compareTo(a.date),
+                          );
 
-                          return Center(
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                if (outerColor != null)
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: outerColor,
-                                      shape: BoxShape.circle,
-                                    ),
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: filteredHistory.length,
+                            itemBuilder: (context, index) {
+                              final record = filteredHistory[index];
+                              return ListTile(
+                                title: Text(
+                                  "${record.date.toLocal().toIso8601String().split('T')[0]} - ${record.shift}",
+                                ),
+                                trailing: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
                                   ),
-                                if (isToday)
-                                  Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.grey,
-                                      shape: BoxShape.circle,
-                                    ),
+                                  decoration: BoxDecoration(
+                                    color: _statusColor(
+                                      record.status,
+                                    ).withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                Text(
-                                  '${day.day}',
-                                  style: TextStyle(
-                                    color: outerColor != null ? Colors.white : Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                  child: Text(
+                                    record.status,
+                                    style: TextStyle(
+                                      color: _statusColor(record.status),
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           );
                         },
                       ),
-                    ),
-
-                    const SizedBox(height: 16),
-                    const Text(
-                      "Attendance History",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Filter and sort attendance
-                    Builder(
-                      builder: (context) {
-                        final filteredHistory = List<AttendanceModel>.from(
-                          worker.attendanceHistory.where((att) =>
-                            att.date.month == displayedMonth.month &&
-                            att.date.year == displayedMonth.year),
-                        );
-                        filteredHistory.sort((a, b) => b.date.compareTo(a.date));
-
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filteredHistory.length,
-                          itemBuilder: (context, index) {
-                            final record = filteredHistory[index];
-                            return ListTile(
-                              title: Text(
-                                "${record.date.toLocal().toIso8601String().split('T')[0]} - ${record.shift}",
-                              ),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(record.status).withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  record.status,
-                                  style: TextStyle(
-                                    color: _statusColor(record.status),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    ),
-  );
-}
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 
   // --------------------------------------------
   // 📌 Helper functions (place at bottom of file)

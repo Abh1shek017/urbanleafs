@@ -126,6 +126,90 @@ Future<List<WorkerSummaryModel>> getWorkerSummaries({
         .snapshots()
         .map((snapshot) => snapshot.docs.length);
   }
+Stream<List<WorkerSummaryModel>> watchWorkerSummaries({
+  required int month,
+  required int year,
+}) {
+  final start = DateTime(year, month, 1);
+  final end   = DateTime(year, month + 1, 0, 23, 59, 59);
+
+  final workersStream = FirebaseFirestore.instance
+      .collection('workers')
+      .where('isActive', isEqualTo: true)
+      .snapshots();
+
+  final attendanceStream = FirebaseFirestore.instance
+      .collection('attendance')
+      .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+      .where('date', isLessThanOrEqualTo:    Timestamp.fromDate(end))
+      .snapshots();
+
+  QuerySnapshot? lastWorkersSnap;
+  QuerySnapshot? lastAttendanceSnap;
+
+  // ✅ Declare subs as nullable BEFORE use
+  StreamSubscription? workersSub;
+  StreamSubscription? attendanceSub;
+
+  final controller = StreamController<List<WorkerSummaryModel>>.broadcast(
+    onCancel: () {
+      workersSub?.cancel();
+      attendanceSub?.cancel();
+    },
+  );
+
+  void recomputeIfReady() {
+    final wSnap = lastWorkersSnap;
+    final aSnap = lastAttendanceSnap;
+    if (wSnap == null || aSnap == null) return;
+
+    final workers = wSnap.docs.map((d) => WorkerModel.fromDoc(d)).toList();
+    final attendanceRecords = aSnap.docs.map((d) => AttendanceModel.fromSnapshot(d)).toList();
+
+    final Map<String, Map<DateTime, Map<String, String>>> attendanceMap = {};
+    for (var rec in attendanceRecords) {
+      final userId = rec.userId;
+      final dateOnly = DateTime(rec.date.year, rec.date.month, rec.date.day);
+      attendanceMap
+          .putIfAbsent(userId, () => {})
+          .putIfAbsent(dateOnly, () => {})[rec.shift] = rec.status;
+    }
+
+    final summaries = workers.map((worker) {
+      final userAtt = attendanceMap[worker.id] ?? {};
+      var present = 0, half = 0, absent = 0;
+      userAtt.forEach((_, shifts) {
+        final presCount = shifts.values.where((s) => s.toLowerCase() == 'present').length;
+        if (presCount == 2) present++;
+        else if (presCount == 1) half++;
+        else absent++;
+      });
+      final history = attendanceRecords.where((a) => a.userId == worker.id).toList();
+      return WorkerSummaryModel(
+        worker: worker,
+        presentDays: present,
+        halfDays: half,
+        absentDays: absent,
+        attendanceHistory: history,
+      );
+    }).toList();
+
+    controller.add(summaries);
+  }
+
+  // ✅ Now safe to assign
+  workersSub = workersStream.listen((snap) {
+    lastWorkersSnap = snap;
+    recomputeIfReady();
+  });
+
+  attendanceSub = attendanceStream.listen((snap) {
+    lastAttendanceSnap = snap;
+    recomputeIfReady();
+  });
+
+  return controller.stream;
+}
 
   /// ✅ Mark attendance using composite doc id {yyyy-MM-dd_userId_shift}
   Future<void> markAttendance({

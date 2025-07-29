@@ -42,16 +42,16 @@ class AttendanceSummaryNotifier extends StateNotifier<AttendanceSummaryState> {
   final AttendanceRepository repo;
 
   AttendanceSummaryNotifier(this.repo)
-      : super(
-          AttendanceSummaryState(
-            month: DateTime.now().month,
-            year: DateTime.now().year,
-            workers: [],
-            isLoading: true,
-          ),
-          
-        );
-
+    : super(
+        AttendanceSummaryState(
+          month: DateTime.now().month,
+          year: DateTime.now().year,
+          workers: [],
+          isLoading: true,
+        ),
+      ) {
+    loadSummaries(); // ✅ Safe place to call on construction
+  }
   Future<void> loadSummaries() async {
     state = state.copyWith(isLoading: true);
     try {
@@ -73,13 +73,15 @@ class AttendanceSummaryNotifier extends StateNotifier<AttendanceSummaryState> {
 
 /// ✅ Updated provider: also watches refresh trigger
 final attendanceSummaryStateProvider =
-    StateNotifierProvider<AttendanceSummaryNotifier, AttendanceSummaryState>((ref) {
-  final repo = ref.read(attendanceRepositoryProvider);
+    StateNotifierProvider<AttendanceSummaryNotifier, AttendanceSummaryState>((
+      ref,
+    ) {
+      final repo = ref.read(attendanceRepositoryProvider);
 
-  // 👇 This will trigger the provider to rebuild when the refresh counter changes
-  ref.watch(attendanceRefreshTriggerProvider);
+      // 👇 This will trigger the provider to rebuild when the refresh counter changes
+      ref.watch(attendanceRefreshTriggerProvider);
 
-  final notifier = AttendanceSummaryNotifier(repo);
-  notifier.loadSummaries(); // 👈 Force reloading when refreshed or rebuilt
-  return notifier;
-});
+      final notifier = AttendanceSummaryNotifier(repo);
+      notifier.loadSummaries(); // 👈 Force reloading when refreshed or rebuilt
+      return notifier;
+    });
