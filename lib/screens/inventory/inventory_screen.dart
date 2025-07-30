@@ -14,6 +14,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 // import '../../utils/format_utils.dart';
 import 'package:intl/intl.dart';
+import '../../providers/stock_history_provider.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({Key? key}) : super(key: key);
@@ -189,7 +190,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
             crossAxisCount: crossAxisCount,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 4/3.5,
+            childAspectRatio: 4 / 3.5,
           ),
           itemCount: sorted.length,
           itemBuilder: (ctx, idx) {
@@ -573,19 +574,64 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
 
                   const Divider(height: 32),
 
-                  // Placeholder for history or extra details
-                  Center(
-                    child: Text(
-                      '— Usage & Restock History —',
-                      style: Theme.of(ctx).textTheme.titleMedium,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Here you can show a small chart or list of past stock changes. '
-                    'For example, last 5 restocks with date & added quantity.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontStyle: FontStyle.italic),
+                  // Stock History
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final historyAsync = ref.watch(
+                        stockHistoryProvider(item.id),
+                      );
+
+                      return historyAsync.when(
+                        loading: () => const CircularProgressIndicator(),
+                        error: (err, stack) => Text('Error: $err'),
+                        data: (historyList) => historyList.isEmpty
+                            ? const Text('No history yet.')
+                            : SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Center(
+                                      child: Text(
+                                        '— Usage & Restock History —',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ...historyList.map((entry) {
+                                      final formattedDate = DateFormat(
+                                        'dd MMM yyyy',
+                                      ).format(entry.date);
+                                      final color = entry.type == 'restock'
+                                          ? Colors.green
+                                          : Colors.red;
+                                      final label = entry.type == 'restock'
+                                          ? 'Restocked'
+                                          : 'Used';
+
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 4.0,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              '$label: ${entry.quantity} pcs',
+                                              style: TextStyle(color: color),
+                                            ),
+                                            Text(formattedDate),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ],
+                                ),
+                              ),
+                      );
+                    },
                   ),
                 ],
               ),

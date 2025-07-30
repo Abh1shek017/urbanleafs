@@ -130,7 +130,7 @@ class _AddInventoryBottomSheetState
 
                         try {
                           final repository = ref.read(inventoryRepositoryProvider);
-                          await repository.addInventory(itemData);
+                         await repository.addInventory(itemData);
                           if (context.mounted) {
                             Navigator.of(context).pop(true);
                           }
