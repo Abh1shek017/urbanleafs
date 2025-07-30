@@ -1,4 +1,3 @@
-// lib/screens/inventory_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +11,6 @@ import '../../services/master_data_service.dart';
 import '../../utils/notifications_util.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
-// import '../../utils/format_utils.dart';
 import 'package:intl/intl.dart';
 import '../../providers/stock_history_provider.dart';
 
@@ -578,7 +576,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                   Consumer(
                     builder: (context, ref, _) {
                       final historyAsync = ref.watch(
-                        stockHistoryProvider(item.id),
+                        stockHistoryStreamProvider(item.id),
                       );
 
                       return historyAsync.when(
@@ -602,7 +600,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                     ...historyList.map((entry) {
                                       final formattedDate = DateFormat(
                                         'dd MMM yyyy',
-                                      ).format(entry.date);
+                                      ).format(entry.timestamp);
                                       final color = entry.type == 'restock'
                                           ? Colors.green
                                           : Colors.red;
@@ -633,9 +631,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                       );
                     },
                   ),
-
-
-                  
                 ],
               ),
             ),

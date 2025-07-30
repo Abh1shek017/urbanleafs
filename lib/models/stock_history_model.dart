@@ -3,19 +3,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class StockHistory {
   final String type; // 'restock' or 'usage'
   final int quantity;
-  final DateTime date;
+  final DateTime timestamp;
 
   StockHistory({
     required this.type,
     required this.quantity,
-    required this.date,
+    required this.timestamp,
   });
 
   factory StockHistory.fromFirestore(Map<String, dynamic> data) {
     return StockHistory(
       type: data['type'] ?? 'unknown',
       quantity: data['quantity'] ?? 0,
-      date: (data['date'] as Timestamp).toDate(),
+      timestamp: (data['timestamp'] as Timestamp).toDate(), // changed
     );
   }
 
@@ -23,7 +23,7 @@ class StockHistory {
     return {
       'type': type,
       'quantity': quantity,
-      'date': Timestamp.fromDate(date),
+      'timestamp': Timestamp.fromDate(timestamp), // changed
     };
   }
 }

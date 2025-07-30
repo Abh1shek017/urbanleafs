@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 class InventoryRepository extends BaseRepository {
   InventoryRepository()
-      : super(FirebaseFirestore.instance.collection('inventory'));
+    : super(FirebaseFirestore.instance.collection('inventory'));
 
   /// Stream of all inventory items (real-time)
   Stream<List<InventoryModel>> getAllInventory() {
@@ -25,69 +25,86 @@ class InventoryRepository extends BaseRepository {
   }
 
   /// Add inventory item - if exists, update quantity instead of creating duplicate
-Future<DocumentReference> addInventory(Map<String, dynamic> inventoryData) async {
-  final itemName = inventoryData['itemName'] as String? ?? '';
-  final unit = inventoryData['unit'] as String? ?? '';
-  final type = inventoryData['type'] as String? ?? 'raw';
-  final quantityToAdd = inventoryData['quantity'] as int? ?? 0;
+  Future<DocumentReference> addInventory(
+    Map<String, dynamic> inventoryData,
+  ) async {
+    final itemName = inventoryData['itemName'] as String? ?? '';
+    final unit = inventoryData['unit'] as String? ?? '';
+    final type = inventoryData['type'] as String? ?? 'raw';
+    final quantityToAdd = inventoryData['quantity'] as int? ?? 0;
 
-  // 🔹 Custom document ID
-  final customDocId = '${itemName.trim()}_${unit.trim()}_${type.trim()}';
+    // 🔹 Custom document ID
+    final customDocId =
+        '${itemName.replaceAll(' ', '')}_${unit.replaceAll(' ', '')}_${type.replaceAll(' ', '')}';
 
-  final docRef = collection.doc(customDocId);
-  final existingDoc = await docRef.get();
+    final docRef = collection.doc(customDocId);
+    final existingDoc = await docRef.get();
 
-  if (existingDoc.exists) {
-    // ✅ Item exists: update quantity
-    final existingData = existingDoc.data() as Map<String, dynamic>? ?? {};
-    final newQuantity = (existingData['quantity'] ?? 0) + quantityToAdd;
+    if (existingDoc.exists) {
+      // ✅ Item exists: update quantity
+      final existingData = existingDoc.data() as Map<String, dynamic>? ?? {};
+      final newQuantity = (existingData['quantity'] ?? 0) + quantityToAdd;
 
-    await docRef.update({
-      'quantity': newQuantity,
-      'lastUpdated': inventoryData['lastUpdated'],
-      'updatedBy': inventoryData['updatedBy'],
-      'type': inventoryData['type'],
-      'unit': inventoryData['unit'],
-      'lowStockThreshold': inventoryData['lowStockThreshold'],
-    });
+      await docRef.update({
+        'quantity': newQuantity,
+        'lastUpdated': inventoryData['lastUpdated'],
+        'updatedBy': inventoryData['updatedBy'],
+        'type': inventoryData['type'],
+        'unit': inventoryData['unit'],
+        'lowStockThreshold': inventoryData['lowStockThreshold'],
+      });
 
-    // ✅ Add history entry
-  final itemName = inventoryData['name']?.toString().replaceAll(' ', '_') ?? 'item';
-final type = 'restock';
-final quantityStr = quantityToAdd.toString();
+      // ✅ Add history entry
+      final itemName =
+          inventoryData['itemName']?.toString().replaceAll(' ', '_') ?? 'item';
+      final type = 'restock';
+      final quantityStr = quantityToAdd.toString();
 
-final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-final customId = '${itemName}_$type${quantityStr}_$formattedDate';
+      final formattedDate = DateFormat(
+        'yyyyMMdd_HHmmss',
+      ).format(DateTime.now());
+      final customId = '${itemName}_$type${quantityStr}_$formattedDate';
 
-await docRef.collection('history').doc(customId).set({
-  'type': type,
-  'quantity': quantityToAdd,
-  'date': Timestamp.now(),
-  'addedBy': inventoryData['updatedBy'],
-});
+      await docRef.collection('history').doc(customId).set({
+        'type': type,
+        'quantity': quantityToAdd,
+        'timestamp': Timestamp.now(),
+        'addedBy': inventoryData['updatedBy'],
+      });
 
-    await _checkLowStockAndNotify({
-      ...inventoryData,
-      'quantity': newQuantity,
-    });
-  } else {
-    // ✅ Item does not exist: create new
-    await docRef.set(inventoryData);
+      await _checkLowStockAndNotify({
+        ...inventoryData,
+        'quantity': newQuantity,
+      });
+    } else {
+      // ✅ Item does not exist: create new
+      await docRef.set(inventoryData);
 
-    // ✅ Add history entry
-    await docRef.collection('history').add({
-      'type': 'restock',
-      'quantity': quantityToAdd,
-      'date': Timestamp.now(),
-      'addedBy': inventoryData['updatedBy'],
-    });
+      final itemName =
+          inventoryData['itemName']?.toString().replaceAll(' ', '_') ?? 'item';
+      final type = 'restock';
+      final quantityStr = quantityToAdd.toString();
 
-    await _checkLowStockAndNotify(inventoryData);
+      // Format: yyyyMMdd_HHmmss (e.g., 20250730_235959)
+      final formattedDate = DateFormat(
+        'yyyyMMdd_HHmmss',
+      ).format(DateTime.now());
+
+      final customId = '${itemName}_$type${quantityStr}_$formattedDate';
+
+      await docRef.collection('history').doc(customId).set({
+        'type': type,
+        'quantity': quantityToAdd,
+        'timestamp':
+            Timestamp.now(), // use 'timestamp' for consistency with your model
+        'addedBy': inventoryData['updatedBy'],
+      });
+
+      await _checkLowStockAndNotify(inventoryData);
+    }
+
+    return docRef;
   }
-
-  return docRef;
-}
-
 
   /// Update existing inventory item by ID
   Future<void> updateInventory(
@@ -104,7 +121,8 @@ await docRef.collection('history').doc(customId).set({
   ) async {
     try {
       final quantity = inventoryData['quantity'] as int? ?? 0;
-      final lowStockThreshold = inventoryData['lowStockThreshold'] as int? ?? 10;
+      final lowStockThreshold =
+          inventoryData['lowStockThreshold'] as int? ?? 10;
       final itemName = inventoryData['itemName'] as String? ?? 'Unknown Item';
       final unit = inventoryData['unit'] as String? ?? 'units';
 
