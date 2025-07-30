@@ -173,6 +173,25 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
           .doc(itemId)
           .update({'quantity': newQty});
 
+final sanitizedItemName = itemName.replaceAll(' ', '_');
+final formatteddate = DateFormat('yyyyMMdd_HHmmss').format(now).substring(0, 15); // trims to 2-digit seconds
+final customId = '${sanitizedItemName}_order_${_quantity}_$formatteddate';
+
+
+await FirebaseFirestore.instance
+    .collection('inventory')
+    .doc(itemId)
+    .collection('history')
+    .doc(customId)
+    .set({
+  'quantity': _quantity,
+  'type': 'used',
+  'reason': 'Order placed by $_selectedCustomer',
+  'relatedOrderId': orderId,
+  'timestamp': Timestamp.fromDate(now),
+  'addedBy': _addedBy,
+});
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order placed successfully!')),
       );
