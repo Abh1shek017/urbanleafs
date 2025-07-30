@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/inventory_model.dart';
 import '../utils/notifications_util.dart';
 import 'base_repository.dart';
+import 'package:intl/intl.dart';
 
 class InventoryRepository extends BaseRepository {
   InventoryRepository()
@@ -51,12 +52,19 @@ Future<DocumentReference> addInventory(Map<String, dynamic> inventoryData) async
     });
 
     // ✅ Add history entry
-    await docRef.collection('history').add({
-      'type': 'restock',
-      'quantity': quantityToAdd,
-      'date': Timestamp.now(),
-      'addedBy': inventoryData['updatedBy'],
-    });
+  final itemName = inventoryData['name']?.toString().replaceAll(' ', '_') ?? 'item';
+final type = 'restock';
+final quantityStr = quantityToAdd.toString();
+
+final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+final customId = '${itemName}_$type${quantityStr}_$formattedDate';
+
+await docRef.collection('history').doc(customId).set({
+  'type': type,
+  'quantity': quantityToAdd,
+  'date': Timestamp.now(),
+  'addedBy': inventoryData['updatedBy'],
+});
 
     await _checkLowStockAndNotify({
       ...inventoryData,

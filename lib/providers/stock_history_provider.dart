@@ -9,8 +9,8 @@ final stockHistoryProvider =
         .collection('inventory')
         .doc(itemId)
         .collection('history')
-        .orderBy('date', descending: true)
-        .limit(5)
+        .orderBy('timestamp', descending: true) 
+        .limit(10)
         .get();
 
     return snapshot.docs
