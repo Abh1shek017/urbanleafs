@@ -6,8 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // Import the models and providers
 import '../../models/transaction_entry_model.dart';
 import '../../providers/balance_sheet_provider.dart';
-import '../../providers/due_provider.dart';
-import '../../repositories/customer_repository.dart';
 
 // Import the new modular widgets
 import '../../widgets/balance_sheet/filter_section.dart';
@@ -155,7 +153,7 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
                             onTotalSoldTap: () => _showTotalSoldDetails(context),
                             onTotalExpensesTap: () => _showTotalExpensesDetails(context),
                             onRawPurchasesTap: () => _showRawPurchasesDetails(context),
-                            onDueAmountsTap: () => _showDueCustomersBottomSheet(context),
+                            onDueAmountsTap: () => showDueCustomersBottomSheet(context),
                           ),
                           
                           const Divider(),
@@ -285,19 +283,6 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
     }).toList();
 
     return list.reversed.toList();
-  }
-
-  Future<double> _calculateTotalSold() async {
-    try {
-      final repo = CustomerRepository();
-      return await repo.getTotalSoldAcrossAllCustomers();
-    } catch (e) {
-      if (mounted) {
-        final error = ErrorHandler.fromException(e);
-        ErrorHandler.showSnackBar(context, error);
-      }
-      return 0.0;
-    }
   }
 
   Future<List<Map<String, dynamic>>> _fetchExpensesForPeriod({String? filterType}) async {
@@ -486,121 +471,6 @@ class _BalanceSheetScreenState extends ConsumerState<BalanceSheetScreen> {
       }
     }
   }
-
-  void _showDueCustomersBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.9,
-          minChildSize: 0.6,
-          maxChildSize: 0.95,
-          builder: (context, scrollController) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 50,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Customers with Outstanding Dues',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Consumer(
-                      builder: (context, ref, _) {
-                        final allCustomersAsync = ref.watch(allCustomersWithDueProvider);
-
-                        return allCustomersAsync.when(
-                          data: (customers) {
-                            if (customers.isEmpty) {
-                              return const Center(child: Text('No customers found.'));
-                            }
-                            return ListView.builder(
-                              controller: scrollController,
-                              itemCount: customers.length,
-                              itemBuilder: (context, index) {
-                                final customer = customers[index];
-                                final due = customer.totalDue;
-                                final cardColor = due <= 0
-                                    ? Colors.grey[100]
-                                    : due < 1000
-                                        ? Colors.green[100]
-                                        : due < 5000
-                                            ? Colors.orange[100]
-                                            : Colors.red[100];
-
-                                return Card(
-                                  color: cardColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  margin: const EdgeInsets.symmetric(vertical: 8),
-                                  child: ListTile(
-                                    leading: customer.profileImageUrl?.isNotEmpty == true
-                                        ? CircleAvatar(
-                                            backgroundImage: NetworkImage(customer.profileImageUrl!),
-                                          )
-                                        : const CircleAvatar(child: Icon(Icons.person)),
-                                    title: Text(
-                                      customer.name,
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                    ),
-                                    subtitle: Text(
-                                      '📞 ${customer.phone}\n🏠 ${customer.address}',
-                                    ),
-                                    isThreeLine: true,
-                                    trailing: Text(
-                                      '₹${due.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    onTap: () {
-                                      showCustomerDetailBottomSheet(
-                                        context,
-                                        customer,
-                                        customer.payments,
-                                      );
-                                    },
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                          loading: () => const Center(child: CircularProgressIndicator()),
-                          error: (err, _) => Center(child: Text('Error: $err')),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   DateTimeRange _getRangeFromQuickFilter(String key) {
     final now = DateTime.now();
 
