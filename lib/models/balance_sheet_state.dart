@@ -1,29 +1,21 @@
+import 'package:flutter/material.dart';
 import '../models/expense_model.dart';
-import '../models/transaction_entry.dart';
+import 'transaction_entry_model.dart';
+import 'balance_sheet_summary_model.dart';
 
 class BalanceSheetState {
   final bool isLoading;
   final String? error;
-
-  final double totalSold;
-  final double totalExpenses;
-  final double totalProfit;
-  final double dueAmounts;
-  final double rawPurchases;
-  final int dueCustomerCount;
-
+  final BalanceSheetSummary? summary;
+  final DateTimeRange? selectedRange;
   final List<TransactionEntry> transactions;
   final List<ExpenseModel> expenses;
 
   BalanceSheetState({
     this.isLoading = false,
     this.error,
-    this.totalSold = 0,
-    this.totalExpenses = 0,
-    this.totalProfit = 0,
-    this.dueAmounts = 0,
-    this.rawPurchases = 0,
-    this.dueCustomerCount = 0,
+    this.summary,
+    this.selectedRange,
     this.expenses = const [],
     this.transactions = const [],
   });
@@ -31,26 +23,26 @@ class BalanceSheetState {
   BalanceSheetState copyWith({
     bool? isLoading,
     String? error,
-    double? totalSold,
-    double? totalExpenses,
-    double? totalProfit,
-    double? dueAmounts,
-    double? rawPurchases,
-    int? dueCustomerCount,
+    BalanceSheetSummary? summary,
+    DateTimeRange? selectedRange,
     List<ExpenseModel>? expenses,
     List<TransactionEntry>? transactions,
   }) {
     return BalanceSheetState(
       isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
-      totalSold: totalSold ?? this.totalSold,
-      totalExpenses: totalExpenses ?? this.totalExpenses,
-      totalProfit: totalProfit ?? this.totalProfit,
-      dueAmounts: dueAmounts ?? this.dueAmounts,
-      rawPurchases: rawPurchases ?? this.rawPurchases,
-      dueCustomerCount: dueCustomerCount ?? this.dueCustomerCount,
+      error: error,
+      summary: summary ?? this.summary,
+      selectedRange: selectedRange ?? this.selectedRange,
       expenses: expenses ?? this.expenses,
       transactions: transactions ?? this.transactions,
     );
   }
+
+  // Helper getters for backward compatibility
+  double get totalSold => summary?.totalSold ?? 0.0;
+  double get totalExpenses => summary?.totalExpenses ?? 0.0;
+  double get totalProfit => summary?.netProfit ?? 0.0;
+  double get dueAmounts => summary?.totalDue ?? 0.0;
+  double get rawPurchases => summary?.rawPurchases ?? 0.0;
+  int get dueCustomerCount => summary?.dueCustomerCount ?? 0;
 }

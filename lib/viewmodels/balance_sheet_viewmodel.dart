@@ -3,14 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/balance_sheet_state.dart';
 import '../models/expense_model.dart';
-import '../models/transaction_entry.dart';
+import '../models/transaction_entry_model.dart';
 import '../../providers/customer_provider.dart';
+import '../../models/balance_sheet_summary_model.dart';
 
 class BalanceSheetViewModel extends StateNotifier<BalanceSheetState> {
   final Ref ref;
 
   BalanceSheetViewModel(this.ref)
-    : super(BalanceSheetState(dueCustomerCount: 0));
+    : super(BalanceSheetState());
 
   Future<void> loadData({required DateTimeRange range}) async {
     try {
@@ -33,7 +34,7 @@ class BalanceSheetViewModel extends StateNotifier<BalanceSheetState> {
 
       double totalSold = 0;
       double totalExpenses = 0;
-      double totalProfit = 0;
+      // double totalProfit = 0;
       double dueAmounts = 0;
       double rawPurchases = 0;
       int dueCustomerCount = 0;
@@ -92,24 +93,25 @@ class BalanceSheetViewModel extends StateNotifier<BalanceSheetState> {
       dueCustomerCount = result.$2;
 
       // Compute final profit
-      totalProfit = totalSold - totalExpenses;
+      // totalProfit = totalSold - totalExpenses;
 
       // Sort transactions by newest first
       transactions.sort((a, b) => b.addedAt.compareTo(a.addedAt));
 
       // Update state
       state = state.copyWith(
-        isLoading: false,
-        totalSold: totalSold,
-        totalExpenses: totalExpenses,
-        totalProfit: totalProfit,
-        dueAmounts: dueAmounts,
-        rawPurchases: rawPurchases,
-        dueCustomerCount: dueCustomerCount,
-        transactions: transactions,
-        expenses: expenses,
-      );
-    } catch (e) {
+  isLoading: false,
+  summary: BalanceSheetSummary(
+    totalSold: totalSold,
+    totalExpenses: totalExpenses,
+    totalDue: dueAmounts,
+    rawPurchases: rawPurchases,
+    dueCustomerCount: dueCustomerCount,
+  ),
+  transactions: transactions,
+  expenses: expenses,
+);
+   } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }

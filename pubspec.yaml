@@ -52,7 +52,8 @@ dependencies:
   url_launcher: ^6.2.4
   flutter_slidable: ^4.0.0
   rxdart: ^0.27.7
-
+  freeze: ^1.0.0
+  freezed_annotation: ^3.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
