@@ -37,7 +37,7 @@ class LoadingOverlay extends StatelessWidget {
             child: GestureDetector(
               onTap: dismissible ? null : () {}, // Prevent taps when not dismissible
               child: Container(
-                color: Colors.black.withOpacity(opacity ?? 0.7),
+                color: Colors.black.withValues(alpha: opacity ?? 0.7),
                 child: Center(
                   child: _buildLoadingWidget(context),
                 ),
@@ -96,7 +96,7 @@ class LoadingOverlay extends StatelessWidget {
           width: 200,
           child: LinearProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(color),
-            backgroundColor: Colors.white.withOpacity(0.3),
+            backgroundColor: Colors.white.withValues(alpha: 0.3),
           ),
         ),
         if (message != null) ...[
@@ -269,7 +269,7 @@ class _DotsIndicatorState extends State<DotsIndicator>
               width: widget.size,
               height: widget.size,
               decoration: BoxDecoration(
-                color: widget.color.withOpacity(opacity),
+                color: widget.color.withValues(alpha: opacity),
                 shape: BoxShape.circle,
               ),
             );
@@ -331,7 +331,7 @@ class _PulseIndicatorState extends State<PulseIndicator>
           width: widget.size,
           height: widget.size,
           decoration: BoxDecoration(
-            color: widget.color.withOpacity(_animation.value),
+            color: widget.color.withValues(alpha: _animation.value),
             shape: BoxShape.circle,
           ),
         );
@@ -355,7 +355,7 @@ class LoadingDialog {
 
     _overlayEntry = OverlayEntry(
       builder: (context) => Material(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withValues(alpha: 0.7),
         child: GestureDetector(
           onTap: barrierDismissible ? hide : null,
           child: LoadingWidget(

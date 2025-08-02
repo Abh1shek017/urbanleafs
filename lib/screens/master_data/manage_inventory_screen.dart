@@ -3,7 +3,6 @@ import '../../services/master_data_service.dart';
 import '../../widgets/glass_cards.dart';
 import '../../utils/staggered_animation.dart';
 import '../../widgets/admin_checker.dart';
-import '../../utils/unique_list_utils.dart';
 
 class ManageInventoryScreen extends StatefulWidget {
   const ManageInventoryScreen({super.key});
@@ -12,21 +11,15 @@ class ManageInventoryScreen extends StatefulWidget {
   State<ManageInventoryScreen> createState() => _ManageInventoryScreenState();
 }
 
-class _ManageInventoryScreenState extends State<ManageInventoryScreen>
-    with SingleTickerProviderStateMixin {
+class _ManageInventoryScreenState extends State<ManageInventoryScreen> {
   final MasterDataService _service = MasterDataService();
 
-  List<String> _inventoryTypes = [];
-  List<String> _units = [];
-  List<String> _itemTypes = [];
-
-  late TabController _tabController;
+  List<Map<String, dynamic>> _inventoryItems = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadLocalData();
   }
 
@@ -34,9 +27,9 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     final data = await _service.loadLocalMasterData();
     if (!mounted) return;
     setState(() {
-      _inventoryTypes = UniqueListUtils.safeUniqueStringList(data['inventoryTypes']);
-      _units = UniqueListUtils.safeUniqueStringList(data['units']);
-      _itemTypes = UniqueListUtils.safeUniqueStringList(data['itemTypes']);
+      _inventoryItems = List<Map<String, dynamic>>.from(
+        data['inventoryTypes'] ?? [],
+      );
       _loading = false;
     });
   }
@@ -46,75 +39,154 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     final data = await _service.fetchAndUpdateFromFirestore();
     if (!mounted) return;
     setState(() {
-      _inventoryTypes = UniqueListUtils.safeUniqueStringList(data['inventoryTypes']);
-      _units = UniqueListUtils.safeUniqueStringList(data['units']);
-      _itemTypes = UniqueListUtils.safeUniqueStringList(data['itemTypes']);
+      _inventoryItems = List<Map<String, dynamic>>.from(
+        data['inventoryTypes'] ?? [],
+      );
       _loading = false;
     });
   }
 
-  Future<void> _addItemDialog(String field, List<String> currentList) async {
-    final controller = TextEditingController();
+  Future<void> _addInventoryItemDialog() async {
+    final nameController = TextEditingController();
+    final unitController = TextEditingController();
+    final typeController = TextEditingController();
+
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("Add ${field.capitalize()}"),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(labelText: field.capitalize()),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 12,
+        backgroundColor: Colors.white,
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.85,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.greenAccent.withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "Add Inventory Item",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: "Item Name",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: unitController,
+                  decoration: const InputDecoration(
+                    labelText: "Unit",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: typeController,
+                  decoration: const InputDecoration(
+                    labelText: "Type",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("Cancel"),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final name = nameController.text.trim();
+                        final unit = unitController.text.trim();
+                        final type = typeController.text.trim();
+
+                        if (name.isEmpty || unit.isEmpty || type.isEmpty) {
+                          _showError("All fields are required.");
+                          return;
+                        }
+
+                        final isDuplicate = _inventoryItems.any(
+                          (item) =>
+                              item['name'].toString().toLowerCase() ==
+                              name.toLowerCase(),
+                        );
+
+                        if (isDuplicate) {
+                          _showError("This item already exists.");
+                          return;
+                        }
+
+                        final newItem = {
+                          'name': name,
+                          'unit': unit,
+                          'type': type,
+                        };
+
+                        final updatedList = [..._inventoryItems, newItem];
+
+                        setState(() {
+                          _inventoryItems = updatedList;
+                        });
+
+                        await _service.updateMasterField(
+                          'inventoryTypes',
+                          updatedList,
+                        );
+
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                      child: const Text("Add"),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newItem = controller.text.trim();
-              if (newItem.isEmpty) {
-                _showError("Value cannot be empty.");
-                return;
-              }
-
-              // ✅ Case-insensitive duplicate check
-              final isDuplicate = currentList.any(
-                (item) => item.toLowerCase() == newItem.toLowerCase(),
-              );
-              if (isDuplicate) {
-                _showError("This $field already exists.");
-                return;
-              }
-
-              final updatedList = List<String>.from(currentList)..add(newItem);
-
-              setState(() {
-                if (field == 'inventoryTypes') _inventoryTypes = updatedList;
-                if (field == 'units') _units = updatedList;
-                if (field == 'itemTypes') _itemTypes = updatedList;
-              });
-
-              await _service.updateMasterField(field, updatedList);
-
-              // ✅ Ensure dialog closes immediately after adding
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text("Add"),
-          ),
-        ],
       ),
     );
   }
 
-  void _deleteItem(String field, List<String> currentList, int index) async {
-    final updatedList = List<String>.from(currentList)..removeAt(index);
+  void _deleteItem(int index) async {
+    final updatedList = List<Map<String, dynamic>>.from(_inventoryItems)
+      ..removeAt(index);
 
     setState(() {
-      if (field == 'inventoryTypes') _inventoryTypes = updatedList;
-      if (field == 'units') _units = updatedList;
-      if (field == 'itemTypes') _itemTypes = updatedList;
+      _inventoryItems = updatedList;
     });
 
-    await _service.updateMasterField(field, updatedList);
+    await _service.updateMasterField('inventoryTypes', updatedList);
   }
 
   void _showError(String message) {
@@ -138,25 +210,10 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     return AdminChecker(
       builder: (context, isAdmin) {
         return Scaffold(
-          appBar: AppBar(
-            title: const Text("Manage Inventory Master Data"),
-            bottom: TabBar(
-              controller: _tabController,
-              tabs: const [
-                Tab(text: "Items"),
-                Tab(text: "Units"),
-                Tab(text: "Types"),
-              ],
-            ),
-          ),
+          appBar: AppBar(title: const Text("Manage Inventory Master Data")),
           floatingActionButton: isAdmin
               ? FloatingActionButton(
-                  onPressed: () {
-                    final idx = _tabController.index;
-                    if (idx == 0) _addItemDialog('inventoryTypes', _inventoryTypes);
-                    if (idx == 1) _addItemDialog('units', _units);
-                    if (idx == 2) _addItemDialog('itemTypes', _itemTypes);
-                  },
+                  onPressed: _addInventoryItemDialog,
                   child: const Icon(Icons.add),
                 )
               : null,
@@ -166,52 +223,98 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                   onRefresh: isAdmin ? _refreshFromFirestore : () async {},
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildList('inventoryTypes', _inventoryTypes, isAdmin),
-                        _buildList('units', _units, isAdmin),
-                        _buildList('itemTypes', _itemTypes, isAdmin),
-                      ],
-                    ),
+                    child: _inventoryItems.isEmpty
+                        ? const Center(
+                            child: Text("No inventory items found. Add some!"),
+                          )
+                        : ListView.builder(
+                            itemCount: _inventoryItems.length,
+                            itemBuilder: (ctx, i) {
+                              final item = _inventoryItems[i];
+                              return StaggeredItem(
+                                index: i,
+                                child: GlassCard(
+                                  onTap: null, // ✅ disable tap to delete
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item['name'],
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.headlineMedium,
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'Unit: ${item['unit']} | Type: ${item['type']}',
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleMedium,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (isAdmin)
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.red,
+                                          ),
+                                          onPressed: () async {
+                                            final shouldDelete = await showDialog<bool>(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                title: const Text(
+                                                  "Confirm Delete",
+                                                ),
+                                                content: const Text(
+                                                  "Are you sure you want to delete this item?",
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          ctx,
+                                                          false,
+                                                        ),
+                                                    child: const Text("Cancel"),
+                                                  ),
+                                                  ElevatedButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          ctx,
+                                                          true,
+                                                        ),
+                                                    style:
+                                                        ElevatedButton.styleFrom(
+                                                          backgroundColor:
+                                                              Colors.red,
+                                                        ),
+                                                    child: const Text("Delete"),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+
+                                            if (shouldDelete == true) {
+                                              _deleteItem(i);
+                                            }
+                                          },
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
                 ),
         );
       },
     );
   }
-
-  Widget _buildList(String field, List<String> list, bool isAdmin) {
-    if (list.isEmpty) {
-      return Center(child: Text("No ${field.capitalize()} found. Add some!"));
-    }
-
-    return ListView.builder(
-      itemCount: list.length,
-      itemBuilder: (ctx, i) => StaggeredItem(
-        index: i,
-        child: GlassCard(
-          onTap: isAdmin ? () => _deleteItem(field, list, i) : null,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  list[i],
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-              if (isAdmin)
-                const Icon(Icons.delete_outline, color: Colors.red),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-extension StringCasingExtension on String {
-  String capitalize() =>
-      isEmpty ? "" : '${this[0].toUpperCase()}${substring(1)}';
 }
