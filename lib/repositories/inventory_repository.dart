@@ -3,6 +3,7 @@ import '../models/inventory_model.dart';
 import '../utils/notifications_util.dart';
 import 'base_repository.dart';
 import 'package:intl/intl.dart';
+import '../models/master_data_model.dart';
 
 class InventoryRepository extends BaseRepository {
   InventoryRepository()
@@ -24,13 +25,134 @@ class InventoryRepository extends BaseRepository {
     );
   }
 
+  Future<void> addPreparedItemWithDeductions({
+    required String preparedName,
+    required num preparedQty,
+    required String unit,
+    required String updatedBy,
+    required num lowStockThreshold,
+    required List<RecipeStep> recipe,
+    bool preventNegative = true,
+  }) async {
+    final nowTs = Timestamp.now();
+    final preparedId =
+        '${preparedName.replaceAll(' ', '')}_${unit.replaceAll(' ', '')}_prepared';
+    final preparedRef = collection.doc(preparedId);
+
+    try {
+      await collection.firestore.runTransaction((tx) async {
+        // 1) Upsert prepared item
+        final preparedSnap = await tx.get(preparedRef);
+        num currentPrepared = 0;
+        if (preparedSnap.exists) {
+          final data = preparedSnap.data() as Map<String, dynamic>? ?? {};
+          currentPrepared = (data['quantity'] as num?) ?? 0;
+          tx.update(preparedRef, {
+            'itemName': preparedName,
+            'unit': unit,
+            'type': 'prepared',
+            'lowStockThreshold': lowStockThreshold,
+            'quantity': (currentPrepared + preparedQty),
+            'lastUpdated': nowTs,
+            'updatedBy': updatedBy,
+          });
+        } else {
+          tx.set(preparedRef, {
+            'itemName': preparedName,
+            'unit': unit,
+            'type': 'prepared',
+            'lowStockThreshold': lowStockThreshold,
+            'quantity': preparedQty,
+            'createdAt': nowTs,
+            'lastUpdated': nowTs,
+            'updatedBy': updatedBy,
+          });
+        }
+
+        String _historyId(String itemName, String type, num qty) {
+          final safeName = itemName.replaceAll(' ', '');
+          final qtyStr = qty.toString();
+          final formattedDate = DateFormat(
+            'yyyyMMdd_HHmmss',
+          ).format(DateTime.now());
+          return '${safeName}$type${qtyStr}$formattedDate';
+        }
+
+        final histIdPrepared = _historyId(preparedName, 'prepare', preparedQty);
+        tx.set(preparedRef.collection('history').doc(histIdPrepared), {
+          'type': 'prepare',
+          'quantity': preparedQty,
+          'timestamp': nowTs,
+          'addedBy': updatedBy,
+        });
+
+        // 2) Deduct raw items
+        for (final step in recipe) {
+          final rawName = step.rawName;
+          final consume = (preparedQty * step.ratio).toDouble();
+
+          final rawQuery = await collection
+              .where('itemName', isEqualTo: rawName)
+              .where('type', isEqualTo: 'Raw Material')
+              .limit(1)
+              .get();
+
+          if (rawQuery.docs.isEmpty) {
+            // dubg// Print('❌ Raw material "$rawName" not found.');
+            throw StateError('Raw material "$rawName" not found.');
+          }
+
+          final rawDoc = rawQuery.docs.first;
+          final rawRef = rawDoc.reference;
+          final rawData = rawDoc.data() as Map<String, dynamic>? ?? {};
+          final currentRaw = (rawData['quantity'] as num?)?.toDouble() ?? 0.0;
+          final newQty = currentRaw - consume;
+
+          if (preventNegative && newQty < 0) {
+            // dubg// Print('❌ Not enough stock for $rawName: $currentRaw available, $consume needed');
+            throw StateError(
+              'Insufficient "$rawName" stock. Need $consume, available $currentRaw.',
+            );
+          }
+
+          tx.update(rawRef, {
+            'quantity': newQty,
+            'lastUpdated': nowTs,
+            'updatedBy': updatedBy,
+          });
+
+          final histIdRaw = _historyId(rawName, 'consume', consume);
+          tx.set(rawRef.collection('history').doc(histIdRaw), {
+            'type': 'consume',
+            'quantity': consume,
+            'timestamp': nowTs,
+            'addedBy': updatedBy,
+            'relatedPrepared': preparedName,
+          });
+        }
+      });
+
+      // dubg// Print('✅ Prepared item "$preparedName" added with deductions.');
+    } catch (e) {
+      // dubg// Print('🔥 Failed to add prepared item: $e\n$st');
+      rethrow;
+    }
+  }
+
+  String historyId(String itemName, String type, num qty) {
+    final name = itemName.replaceAll(' ', '');
+    final quantityStr = qty.toString();
+    final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    return '${name}$type$quantityStr$formattedDate';
+  }
+
   /// Add inventory item - if exists, update quantity instead of creating duplicate
   Future<DocumentReference> addInventory(
     Map<String, dynamic> inventoryData,
   ) async {
     final itemName = inventoryData['itemName'] as String? ?? '';
     final unit = inventoryData['unit'] as String? ?? '';
-    final type = inventoryData['type'] as String? ?? 'raw';
+    final type = inventoryData['type'] as String? ?? 'Raw Material';
     final quantityToAdd = inventoryData['quantity'] as int? ?? 0;
 
     // 🔹 Custom document ID
