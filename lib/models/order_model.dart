@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class OrderModel {
   final String id;
   final String item;
-  final int quantity;
+  final double quantity;
   final double price;
   final double totalAmount;
   final double amountPaid;
@@ -31,7 +31,7 @@ class OrderModel {
     return OrderModel(
       id: snapshot.id,
       item: data?['item'] ?? 'Unknown Item',
-      quantity: (data?['quantity'] ?? 0) as int,
+      quantity: (data?['quantity'] as num?)?.toDouble() ?? 0.0,
       price: (data?['price'] is num) ? (data!['price'] as num).toDouble() : 0.0,
       totalAmount: (data?['totalAmount'] is num)
           ? (data!['totalAmount'] as num).toDouble()

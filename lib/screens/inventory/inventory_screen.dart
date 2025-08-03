@@ -145,13 +145,24 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     String userId,
   ) {
     // Apply search/filter/sort
-    var filtered = items.where(
-      (i) => i.itemName.toLowerCase().contains(_searchQuery.toLowerCase()),
-    );
-    if (_filterType != 'all')
-      filtered = filtered.where((i) => i.type == _filterType);
-    if (_lowStockOnly)
+    var filtered = _searchQuery.trim().isEmpty
+        ? items
+        : items.where((i) {
+            final itemName = i.itemName.toLowerCase();
+            final query = _searchQuery.trim().toLowerCase();
+            return itemName.contains(query);
+          });
+
+    if (_filterType != 'all') {
+      filtered = filtered.where(
+        (i) => i.type.trim().toLowerCase() == _filterType.trim().toLowerCase(),
+      );
+    }
+
+    if (_lowStockOnly) {
       filtered = filtered.where((i) => i.quantity < i.lowStockThreshold);
+    }
+
     final sorted = filtered.toList()
       ..sort((a, b) {
         switch (_sortBy) {
@@ -176,7 +187,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
         ),
       );
     }
-
     return LayoutBuilder(
       builder: (ctx, constraints) {
         final maxWidth = constraints.maxWidth;
@@ -284,7 +294,9 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                               ),
 
                               const SizedBox(height: 7),
-                              Text('Qty: ${item.quantity} ${item.unit}'),
+                              Text(
+                                'Qty: ${item.quantity.toStringAsFixed(1)} ${item.unit}',
+                              ),
                               Text(
                                 'Type: ${item.type.toUpperCase()}',
                                 overflow: TextOverflow.ellipsis,
@@ -353,10 +365,22 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
         title: const Text('Search'),
         content: TextField(
           autofocus: true,
+          keyboardType: TextInputType.text,
           decoration: const InputDecoration(hintText: 'Item name…'),
-          onChanged: (v) => setState(() => _searchQuery = v),
+          onChanged: (v) => setState(() => _searchQuery = v.trim()),
+          onSubmitted: (v) {
+            setState(() => _searchQuery = v.trim());
+            Navigator.pop(context); // Optional: close on submit
+          },
         ),
         actions: [
+          TextButton(
+            onPressed: () {
+              setState(() => _searchQuery = '');
+              Navigator.pop(context);
+            },
+            child: const Text('Clear'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
@@ -381,7 +405,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                 items: const [
                   DropdownMenuItem(value: 'all', child: Text('All')),
                   DropdownMenuItem(
-                    value: 'RAW MATERIAL',
+                    value: 'Raw Material',
                     child: Text('Raw Material'),
                   ),
                   DropdownMenuItem(value: 'Prepared', child: Text('Prepared')),
@@ -604,9 +628,19 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                       final color = entry.type == 'restock'
                                           ? Colors.green
                                           : Colors.red;
+
+                                      // Determine label based on type
                                       final label = entry.type == 'restock'
                                           ? 'Restocked'
+                                          : item.type == 'Prepared'
+                                          ? 'Order'
                                           : 'Used';
+
+                                      // Format quantity
+                                      final quantityText =
+                                          entry.quantity % 1 == 0
+                                          ? entry.quantity.toInt().toString()
+                                          : entry.quantity.toStringAsFixed(1);
 
                                       return Padding(
                                         padding: const EdgeInsets.symmetric(
@@ -617,7 +651,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              '$label: ${entry.quantity} pcs',
+                                              '$label: $quantityText ${item.unit}',
                                               style: TextStyle(color: color),
                                             ),
                                             Text(formattedDate),

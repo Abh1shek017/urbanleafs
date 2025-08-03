@@ -36,23 +36,25 @@ class InventoryRepository extends BaseRepository {
   }) async {
     final nowTs = Timestamp.now();
     final preparedId =
-        '${preparedName.replaceAll(' ', '')}_${unit.replaceAll(' ', '')}_prepared';
+        '${preparedName.replaceAll(' ', '')}_${unit.replaceAll(' ', '')}Prepared';
     final preparedRef = collection.doc(preparedId);
 
     try {
       await collection.firestore.runTransaction((tx) async {
-        // 1) Upsert prepared item
+        // ==== 1. UPSERT PREPARED ITEM ====
         final preparedSnap = await tx.get(preparedRef);
         num currentPrepared = 0;
+
         if (preparedSnap.exists) {
           final data = preparedSnap.data() as Map<String, dynamic>? ?? {};
           currentPrepared = (data['quantity'] as num?) ?? 0;
+
           tx.update(preparedRef, {
             'itemName': preparedName,
             'unit': unit,
-            'type': 'prepared',
+            'type': 'Prepared',
             'lowStockThreshold': lowStockThreshold,
-            'quantity': (currentPrepared + preparedQty),
+            'quantity': ((currentPrepared + preparedQty.toDouble()) * 100).roundToDouble() / 100,
             'lastUpdated': nowTs,
             'updatedBy': updatedBy,
           });
@@ -60,37 +62,45 @@ class InventoryRepository extends BaseRepository {
           tx.set(preparedRef, {
             'itemName': preparedName,
             'unit': unit,
-            'type': 'prepared',
+            'type': 'Prepared',
             'lowStockThreshold': lowStockThreshold,
-            'quantity': preparedQty,
+           'quantity': (preparedQty.toDouble() * 100).roundToDouble() / 100,
             'createdAt': nowTs,
             'lastUpdated': nowTs,
             'updatedBy': updatedBy,
           });
         }
 
-        String _historyId(String itemName, String type, num qty) {
+        // ==== 2. ADD HISTORY ENTRY FOR PREPARED ITEM ====
+        String _historyId(String itemName, String actionType, num qty) {
           final safeName = itemName.replaceAll(' ', '');
-          final qtyStr = qty.toString();
+          final qtyStr = qty % 1 == 0
+              ? qty.toInt().toString()
+              : qty.toStringAsFixed(1);
           final formattedDate = DateFormat(
             'yyyyMMdd_HHmmss',
           ).format(DateTime.now());
-          return '${safeName}$type${qtyStr}$formattedDate';
+          return '${safeName}_$actionType$qtyStr$formattedDate';
         }
 
-        final histIdPrepared = _historyId(preparedName, 'prepare', preparedQty);
+        final histIdPrepared = _historyId(
+          preparedName,
+          'prepared',
+          preparedQty,
+        );
         tx.set(preparedRef.collection('history').doc(histIdPrepared), {
-          'type': 'prepare',
-          'quantity': preparedQty,
+          'type': 'restock',
+          'quantity': (preparedQty * 100).roundToDouble() / 100,
           'timestamp': nowTs,
           'addedBy': updatedBy,
         });
 
-        // 2) Deduct raw items
+        // ==== 3. VALIDATE AND DEDUCT RAW MATERIALS ====
+        // debugPrint('📋 Recipe being used for "$preparedName":');
         for (final step in recipe) {
-          final rawName = step.rawName;
-          final consume = (preparedQty * step.ratio).toDouble();
-
+          final rawName = step.rawName.trim();
+          final consumeQty = (preparedQty * step.ratio).toDouble();
+          // debugPrint('➡️ Raw: "${step.rawName.trim()}", Ratio: ${step.ratio}');
           final rawQuery = await collection
               .where('itemName', isEqualTo: rawName)
               .where('type', isEqualTo: 'Raw Material')
@@ -98,7 +108,7 @@ class InventoryRepository extends BaseRepository {
               .get();
 
           if (rawQuery.docs.isEmpty) {
-            // dubg// Print('❌ Raw material "$rawName" not found.');
+            // debugPrint('❌ Raw material "$rawName" not found in inventory.');
             throw StateError('Raw material "$rawName" not found.');
           }
 
@@ -106,25 +116,28 @@ class InventoryRepository extends BaseRepository {
           final rawRef = rawDoc.reference;
           final rawData = rawDoc.data() as Map<String, dynamic>? ?? {};
           final currentRaw = (rawData['quantity'] as num?)?.toDouble() ?? 0.0;
-          final newQty = currentRaw - consume;
+          final newQty = currentRaw - consumeQty;
+
+          // debugPrint('🔄 Consuming $consumeQty of $rawName (available: $currentRaw)');
 
           if (preventNegative && newQty < 0) {
-            // dubg// Print('❌ Not enough stock for $rawName: $currentRaw available, $consume needed');
             throw StateError(
-              'Insufficient "$rawName" stock. Need $consume, available $currentRaw.',
+              'Insufficient "$rawName" stock. Needed $consumeQty, available $currentRaw.',
             );
           }
 
+          // Update inventory
           tx.update(rawRef, {
-            'quantity': newQty,
+            'quantity': (newQty * 100).roundToDouble() / 100,
             'lastUpdated': nowTs,
             'updatedBy': updatedBy,
           });
 
-          final histIdRaw = _historyId(rawName, 'consume', consume);
+          // Add history
+          final histIdRaw = _historyId(rawName, 'consume', consumeQty);
           tx.set(rawRef.collection('history').doc(histIdRaw), {
             'type': 'consume',
-            'quantity': consume,
+            'quantity': (consumeQty * 100).roundToDouble() / 100,
             'timestamp': nowTs,
             'addedBy': updatedBy,
             'relatedPrepared': preparedName,
@@ -132,9 +145,9 @@ class InventoryRepository extends BaseRepository {
         }
       });
 
-      // dubg// Print('✅ Prepared item "$preparedName" added with deductions.');
+      // debugPrint('✅ Prepared item "$preparedName" added and raw materials deducted.');
     } catch (e) {
-      // dubg// Print('🔥 Failed to add prepared item: $e\n$st');
+      // debugPrint('🔥 Failed to add prepared item: $e\n$st');
       rethrow;
     }
   }
@@ -153,7 +166,8 @@ class InventoryRepository extends BaseRepository {
     final itemName = inventoryData['itemName'] as String? ?? '';
     final unit = inventoryData['unit'] as String? ?? '';
     final type = inventoryData['type'] as String? ?? 'Raw Material';
-    final quantityToAdd = inventoryData['quantity'] as int? ?? 0;
+    final quantityToAdd =
+        (inventoryData['quantity'] as num?)?.toDouble() ?? 0.0;
 
     // 🔹 Custom document ID
     final customDocId =
@@ -165,7 +179,9 @@ class InventoryRepository extends BaseRepository {
     if (existingDoc.exists) {
       // ✅ Item exists: update quantity
       final existingData = existingDoc.data() as Map<String, dynamic>? ?? {};
-      final newQuantity = (existingData['quantity'] ?? 0) + quantityToAdd;
+      final existingQuantity =
+          (existingData['quantity'] as num?)?.toDouble() ?? 0.0;
+      final newQuantity = existingQuantity + quantityToAdd;
 
       await docRef.update({
         'quantity': newQuantity,
@@ -242,9 +258,10 @@ class InventoryRepository extends BaseRepository {
     Map<String, dynamic> inventoryData,
   ) async {
     try {
-      final quantity = inventoryData['quantity'] as int? ?? 0;
+      final quantity = (inventoryData['quantity'] as num?)?.toDouble() ?? 0.0;
       final lowStockThreshold =
-          inventoryData['lowStockThreshold'] as int? ?? 10;
+          (inventoryData['lowStockThreshold'] as num?)?.toDouble() ?? 10.0;
+
       final itemName = inventoryData['itemName'] as String? ?? 'Unknown Item';
       final unit = inventoryData['unit'] as String? ?? 'units';
 

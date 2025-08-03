@@ -202,7 +202,7 @@ class _AddInventoryBottomSheetState
 
                               setState(() => _saving = true);
                               try {
-                                if (meta.type.toLowerCase() == 'prepared') {
+                                if (meta.type.trim() == 'Prepared'){
                                   if (meta.recipe.isEmpty) {
                                     // Decide: block or allow simple add
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -240,7 +240,6 @@ class _AddInventoryBottomSheetState
                                   Navigator.of(context).pop(true);
                                 }
                               } catch (e) {
-                                // dubg// Print('🔥 Error while adding item: $e\n$st');
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(

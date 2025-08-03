@@ -41,7 +41,7 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
     try {
       final storageRef = FirebaseStorage.instance
           .ref()
-          .child('customer_profiles/$customerId.jpg');
+          .child('customer_images/$customerId.jpg');
       final uploadTask = await storageRef.putFile(_selectedImage!);
       return await uploadTask.ref.getDownloadURL();
     } catch (e) {
