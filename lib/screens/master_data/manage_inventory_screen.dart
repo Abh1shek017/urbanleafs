@@ -106,7 +106,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.greenAccent.withOpacity(0.3),
+                color: Colors.greenAccent.withValues(alpha:0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),

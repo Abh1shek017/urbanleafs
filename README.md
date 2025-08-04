@@ -84,13 +84,12 @@ A comprehensive business management Flutter application designed for small to me
 - Android Studio / VS Code
 - Firebase project setup
 - Android SDK (for Android builds)
-- Xcode (for iOS builds, macOS only)
 
 ## 🚀 Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/urbanleafs.git
+   git clone https://github.com/abh1shek017/urbanleafs.git
    cd urbanleafs
    ```
 
