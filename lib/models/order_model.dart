@@ -44,7 +44,7 @@ class OrderModel {
       orderTime: (data?['orderTime'] is Timestamp)
           ? (data!['orderTime'] as Timestamp).toDate()
           : DateTime.now(),
-      addedBy: data?['addedBy'] ?? 'Unknown',
+      addedBy: data?['receivedBy'] ?? 'Unknown',
     );
   }
 
@@ -58,7 +58,7 @@ class OrderModel {
       'paymentStatus': paymentStatus,
       'customerName': customerName,
       'orderTime': orderTime,
-      'addedBy': addedBy,
+      'recievedBy': addedBy,
     };
   }
 }

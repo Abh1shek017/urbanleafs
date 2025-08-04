@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:urbanleafs/providers/current_user_stream_provider.dart';
+import 'package:urbanleafs/providers/auth_provider.dart';
 import 'package:intl/intl.dart';
 
 class AddOrderCard extends ConsumerStatefulWidget {
@@ -122,14 +122,8 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
       final orderId =
           '${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}_${sanitize(_selectedCustomer!)}_${sanitize(itemName)}';
 
-      final userAsync = ref.read(currentUserStreamProvider);
-      String _addedBy = 'Unknown';
-
-      userAsync.when(
-        data: (user) => _addedBy = user?.username ?? 'Unknown',
-        loading: () => _addedBy = 'Loading...',
-        error: (_, __) => _addedBy = 'Unknown',
-      );
+      final authState = ref.read(authStateProvider).value;
+      String _addedBy = authState?.uid ?? 'Unknown';
 
       await customerDoc.collection('orders').doc(orderId).set({
         'item': itemName,
@@ -161,7 +155,7 @@ class _AddOrderCardState extends ConsumerState<AddOrderCard> {
         'totalAmount': _totalAmount,
         'status': _paymentStatus,
         'note': 'Auto-payment for order $orderId',
-        'receivedBy': _addedBy, // 👈 Replace with actual user ID (string)
+        'receivedBy': _addedBy, // 👈 Now stores the actual user ID (uid)
         'receivedTime': now,
         'timestamp': now, // Optional: Keep for sorting or historical tracking
       });

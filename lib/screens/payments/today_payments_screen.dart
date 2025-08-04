@@ -16,7 +16,7 @@ class TodayPaymentsScreen extends ConsumerWidget {
     final user = ref.watch(authStateProvider).value;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Today's Collection")),
+      appBar: AppBar(title: const Text("Today's Payment's")),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -33,19 +33,23 @@ class TodayPaymentsScreen extends ConsumerWidget {
                 child: Text('Error loading payments: $err'),
               ),
               data: (payments) {
-                if (payments.isEmpty) {
+                final validPayments = payments
+                    .where((p) => p.amount > 0)
+                    .toList();
+
+                if (validPayments.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.all(16.0),
-                    child: Text('No payments found today.'),
+                    child: Text('No payments greater than ₹0 found today.'),
                   );
                 }
 
                 return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: payments.length,
+                  itemCount: validPayments.length,
                   itemBuilder: (context, index) {
-                    final payment = payments[index];
+                    final payment = validPayments[index];
                     final formattedTime = DateFormat(
                       'hh:mm a',
                     ).format(payment.receivedTime);
@@ -57,6 +61,23 @@ class TodayPaymentsScreen extends ConsumerWidget {
                       ),
                       child: Consumer(
                         builder: (context, ref, _) {
+                          if (payment.receivedBy.isEmpty) {
+                            return ListTile(
+                              title: Text(payment.customerName),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Amount: ₹${payment.amount.toStringAsFixed(2)}',
+                                  ),
+                                  Text('Received at: $formattedTime'),
+                                  Text('Mode: ${payment.type}'),
+                                  const Text('Added by: System'),
+                                ],
+                              ),
+                            );
+                          }
+
                           final userNameAsync = ref.watch(
                             userNameByIdProvider(payment.receivedBy),
                           );
@@ -70,7 +91,12 @@ class TodayPaymentsScreen extends ConsumerWidget {
                                   'Amount: ₹${payment.amount.toStringAsFixed(2)}',
                                 ),
                                 Text('Received at: $formattedTime'),
-                                Text('Mode: ${payment.type}'),
+                                Text(
+                                  payment.note != null &&
+                                          payment.note!.isNotEmpty
+                                      ? 'Mode: Paid with Order'
+                                      : 'Mode: ${payment.type}',
+                                ),
                                 userNameAsync.when(
                                   data: (name) => Text('Added by: $name'),
                                   loading: () => const Text('Added by: ...'),

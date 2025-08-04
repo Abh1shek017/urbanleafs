@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 class PaymentModel {
   final String id;
   final double amount;
@@ -9,6 +8,7 @@ class PaymentModel {
   final String type; // e.g., 'cash' or 'online'
   final String customerId; // 🔥 required for collectionGroup queries
   final String paymentId;
+  final String? note; // ✅ NEW: identifies order-based payments
 
   PaymentModel({
     required this.id,
@@ -19,9 +19,9 @@ class PaymentModel {
     required this.type,
     required this.customerId,
     required this.paymentId,
+    this.note, // ✅ optional
   });
 
-  /// ✅ Factory from Firestore DocumentSnapshot
   factory PaymentModel.fromSnapshot(DocumentSnapshot snapshot) {
     final data = snapshot.data() as Map<String, dynamic>? ?? {};
     return PaymentModel(
@@ -33,10 +33,10 @@ class PaymentModel {
       type: data['type'] as String? ?? '',
       customerId: data['customerId'] as String? ?? '',
       paymentId: data['paymentId'] as String? ?? '',
+      note: data['note'] as String?, // ✅ added here
     );
   }
 
-  /// ✅ Factory from plain Map (used in .map(...) situations)
   factory PaymentModel.fromMap(Map<String, dynamic> data, String id) {
     return PaymentModel(
       id: id,
@@ -47,10 +47,10 @@ class PaymentModel {
       type: data['type'] as String? ?? '',
       customerId: data['customerId'] as String? ?? '',
       paymentId: data['paymentId'] as String? ?? '',
+      note: data['note'] as String?, // ✅ added here
     );
   }
 
-  /// ✅ Create a copy with optional overrides
   PaymentModel copyWith({
     String? id,
     double? amount,
@@ -60,6 +60,7 @@ class PaymentModel {
     String? type,
     String? customerId,
     String? paymentId,
+    String? note, // ✅ added
   }) {
     return PaymentModel(
       id: id ?? this.id,
@@ -70,10 +71,10 @@ class PaymentModel {
       type: type ?? this.type,
       customerId: customerId ?? this.customerId,
       paymentId: paymentId ?? this.paymentId,
+      note: note ?? this.note, // ✅ added
     );
   }
 
-  /// ✅ Convert to Firestore JSON format
   Map<String, dynamic> toJson() {
     return {
       'amount': amount,
@@ -83,6 +84,7 @@ class PaymentModel {
       'type': type,
       'customerId': customerId,
       'paymentId': paymentId,
+      if (note != null) 'note': note, // ✅ include only if present
     };
   }
 }

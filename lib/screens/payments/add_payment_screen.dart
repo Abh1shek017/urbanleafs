@@ -24,7 +24,6 @@ class AddPaymentCard extends ConsumerStatefulWidget {
 class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
-  String? _selectedCustomerId;
   CustomerEntry? _selectedCustomer;
   String _paymentType = AppConstants.paymentCash;
 
@@ -122,7 +121,6 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
           setState(() {
             _amountController.clear();
             _selectedCustomer = null;
-            _selectedCustomerId = null;
             _paymentType = AppConstants.paymentCash;
           });
         });
@@ -181,7 +179,6 @@ class _AddPaymentCardState extends ConsumerState<AddPaymentCard> {
                   onChanged: (val) {
                     setState(() {
                       _selectedCustomer = val;
-                      _selectedCustomerId = val?.id;
                     });
                   },
                   validator: (val) => val == null ? 'Select a customer' : null,
