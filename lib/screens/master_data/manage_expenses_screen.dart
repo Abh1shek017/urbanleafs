@@ -24,13 +24,19 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
 
   Future<void> _loadData() async {
     final data = await _service.loadLocalMasterData();
-    final expenseTypes = UniqueListUtils.safeUniqueStringList(data['expenseTypes']);
+    final expenseTypes = UniqueListUtils.safeUniqueStringList(
+      data['expenseTypes'],
+    );
     if (!mounted) return;
 
     if (expenseTypes.isEmpty) {
       final fresh = await _service.fetchAndUpdateFromFirestore();
       if (!mounted) return;
-      setState(() => _expenseTypes = UniqueListUtils.safeUniqueStringList(fresh['expenseTypes']));
+      setState(
+        () => _expenseTypes = UniqueListUtils.safeUniqueStringList(
+          fresh['expenseTypes'],
+        ),
+      );
     } else {
       setState(() => _expenseTypes = expenseTypes);
     }
@@ -39,7 +45,11 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
   Future<void> _pullRefresh() async {
     final fresh = await _service.fetchAndUpdateFromFirestore();
     if (!mounted) return;
-    setState(() => _expenseTypes = UniqueListUtils.safeUniqueStringList(fresh['expenseTypes']));
+    setState(
+      () => _expenseTypes = UniqueListUtils.safeUniqueStringList(
+        fresh['expenseTypes'],
+      ),
+    );
   }
 
   void _addItem() async {
@@ -98,11 +108,31 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
     final updatedList = List<String>.from(_expenseTypes)..removeAt(i);
     setState(() => _expenseTypes = updatedList);
 
-    await Future.wait([
-      _service.updateMasterField('expenseTypes', _expenseTypes),
-    ]);
+    await _service.updateMasterField('expenseTypes', _expenseTypes);
+  }
 
-    await _loadData();
+  void _confirmDelete(int i) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Confirm Delete"),
+        content: Text("Are you sure you want to delete '${_expenseTypes[i]}'?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx); // close confirmation
+              _deleteItem(i);
+            },
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showError(String message) {
@@ -139,20 +169,32 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
               padding: const EdgeInsets.all(16),
               child: ListView.builder(
                 itemCount: _expenseTypes.length,
-                itemBuilder: (ctx, i) => StaggeredItem(
-                  index: i,
-                  child: GlassCard(
-                    onTap: isAdmin ? () => _deleteItem(i) : null,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _expenseTypes[i],
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        if (isAdmin)
-                          const Icon(Icons.delete_outline, color: Colors.red),
-                      ],
+                itemBuilder: (ctx, i) => Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: 12,
+                  ), // 🔹 add space between cards
+                  child: StaggeredItem(
+                    index: i,
+                    child: GlassCard(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _expenseTypes[i],
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                          if (isAdmin)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                              ),
+                              onPressed: () => _confirmDelete(
+                                i,
+                              ), // 🔹 delete with confirmation
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

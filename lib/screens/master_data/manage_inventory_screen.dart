@@ -91,6 +91,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     final nameController = TextEditingController();
     final unitController = TextEditingController();
     final typeController = TextEditingController();
+    final sizeController = TextEditingController(); // Added size controller
 
     await showDialog(
       context: context,
@@ -106,7 +107,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.greenAccent.withValues(alpha:0.3),
+                color: Colors.greenAccent.withOpacity(0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -146,6 +147,14 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                     border: OutlineInputBorder(),
                   ),
                 ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: sizeController, // Size input
+                  decoration: const InputDecoration(
+                    labelText: "Size",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -171,8 +180,12 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                         final name = nameController.text.trim();
                         final unit = unitController.text.trim();
                         final type = typeController.text.trim();
+                        final size = sizeController.text.trim(); // Capture size
 
-                        if (name.isEmpty || unit.isEmpty || type.isEmpty) {
+                        if (name.isEmpty ||
+                            unit.isEmpty ||
+                            type.isEmpty ||
+                            size.isEmpty) {
                           _showError("All fields are required.");
                           return;
                         }
@@ -192,6 +205,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                           'name': name,
                           'unit': unit,
                           'type': type,
+                          'size': size, // Save size
                         };
 
                         final updatedList = [..._inventoryItems, newItem];
@@ -208,6 +222,158 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                         if (ctx.mounted) Navigator.pop(ctx);
                       },
                       child: const Text("Add"),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editInventoryItemDialog(int index) async {
+    final item = _inventoryItems[index];
+    final nameController = TextEditingController(text: item['name'] ?? '');
+    final unitController = TextEditingController(text: item['unit'] ?? '');
+    final typeController = TextEditingController(text: item['type'] ?? '');
+    final sizeController = TextEditingController(text: item['size'] ?? '');
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 12,
+        backgroundColor: Colors.white,
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.85,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.greenAccent.withValues(alpha: .3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "Edit Inventory Item",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: "Item Name",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: unitController,
+                  decoration: const InputDecoration(
+                    labelText: "Unit",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: typeController,
+                  decoration: const InputDecoration(
+                    labelText: "Type",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: sizeController,
+                  decoration: const InputDecoration(
+                    labelText: "Size",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("Cancel"),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final name = nameController.text.trim();
+                        final unit = unitController.text.trim();
+                        final type = typeController.text.trim();
+                        final size = sizeController.text.trim();
+
+                        if (name.isEmpty ||
+                            unit.isEmpty ||
+                            type.isEmpty ||
+                            size.isEmpty) {
+                          _showError("All fields are required.");
+                          return;
+                        }
+
+                        // Check duplicate names except current item
+                        final isDuplicate = _inventoryItems.any(
+                          (otherItem) =>
+                              otherItem != item &&
+                              otherItem['name'].toString().toLowerCase() ==
+                                  name.toLowerCase(),
+                        );
+
+                        if (isDuplicate) {
+                          _showError(
+                            "Another item with this name already exists.",
+                          );
+                          return;
+                        }
+
+                        final updatedItem = {
+                          'name': name,
+                          'unit': unit,
+                          'type': type,
+                          'size': size,
+                          if (item['recipe'] != null) 'recipe': item['recipe'],
+                        };
+
+                        final updatedList = List<Map<String, dynamic>>.from(
+                          _inventoryItems,
+                        );
+                        updatedList[index] = updatedItem;
+
+                        setState(() => _inventoryItems = updatedList);
+                        await _service.updateMasterField(
+                          'inventoryTypes',
+                          updatedList,
+                        );
+
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                      child: const Text("Save"),
                     ),
                   ],
                 ),
@@ -389,66 +555,85 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
         padding: const EdgeInsets.all(16),
         child: _inventoryItems.isEmpty
             ? const Center(child: Text('No inventory items found. Add some!'))
-            : ListView.builder(
+            : ListView.separated(
                 itemCount: _inventoryItems.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(height: 12), // space between cards
                 itemBuilder: (ctx, i) {
                   final item = _inventoryItems[i];
                   return GlassCard(
                     onTap: null,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['name'],
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Unit: ${item['unit']} | Type: ${item['type']}',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isAdmin)
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            onPressed: () async {
-                              final shouldDelete = await showDialog<bool>(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('Confirm Delete'),
-                                  content: const Text(
-                                    'Are you sure you want to delete this item?',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(ctx, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                      ),
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
+                    child: Padding(
+                      padding: const EdgeInsets.all(5), // inner padding
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['name'],
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
                                 ),
-                              );
-                              if (shouldDelete == true) _deleteItem(i);
-                            },
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Unit: ${item['unit']} | Type: ${item['type']} | Size: ${item['size'] ?? '-'}',
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                              ],
+                            ),
                           ),
-                      ],
+                          if (isAdmin)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.edit,
+                                    color: Colors.blue,
+                                  ),
+                                  onPressed: () => _editInventoryItemDialog(i),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () async {
+                                    final shouldDelete = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Confirm Delete'),
+                                        content: const Text(
+                                          'Are you sure you want to delete this item?',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () =>
+                                                Navigator.pop(ctx, true),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                            ),
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (shouldDelete == true) _deleteItem(i);
+                                  },
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -557,12 +742,16 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
             title: const Text('Manage Inventory Master Data'),
             bottom: TabBar(
               controller: _tabController,
+              labelColor: Colors.white, // selected tab text color
+              unselectedLabelColor: Colors.white70, // unselected tab text color
+              indicatorColor: Colors.white, // underline for selected tab
               tabs: const [
                 Tab(text: 'Items'),
                 Tab(text: 'Recipes'),
               ],
             ),
           ),
+
           body: _loading
               ? const Center(child: CircularProgressIndicator())
               : TabBarView(
