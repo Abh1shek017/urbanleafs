@@ -242,33 +242,30 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           GestureDetector(
-                            onTap: () async {
-                              final Uri phoneUri = Uri(
-                                scheme: 'tel',
-                                path: worker.worker.phone,
-                              );
-                              if (await canLaunchUrl(phoneUri)) {
-                                await launchUrl(phoneUri);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Could not launch phone dialer',
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                            child: Text(
-                              "📞 ${worker.worker.phone}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.blueAccent,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
+  onTap: () async {
+    final cleanedNumber = worker.worker.phone.replaceAll(RegExp(r'\s+'), '');
+    final Uri phoneUri = Uri(scheme: 'tel', path: cleanedNumber);
+    if (await canLaunchUrl(phoneUri)) {
+      await launchUrl(phoneUri, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not launch phone dialer'),
+        ),
+      );
+    }
+  },
+  child: Text(
+    "📞 ${worker.worker.phone}",
+    style: const TextStyle(
+      fontWeight: FontWeight.bold,
+      fontSize: 16,
+      color: Colors.blueAccent,
+      decoration: TextDecoration.underline,
+    ),
+  ),
+),
+
                           Expanded(
                             child: Text(
                               "🏠 ${worker.worker.address}",

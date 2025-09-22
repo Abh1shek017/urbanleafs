@@ -93,12 +93,21 @@ Future<void> _deleteCustomer(String id) async {
   }
 }
 
-  void _launchPhoneCall(String phoneNumber) async {
-    final uri = Uri.parse('tel:$phoneNumber');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+void _launchPhoneCall(String phoneNumber) async {
+  final uri = Uri(scheme: 'tel', path: phoneNumber);
+
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication, // ensures the dialer app opens
+    );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not launch phone dialer')),
+    );
   }
+}
+
 
   void _openEditScreen(CustomerModel customer) async {
   await Navigator.push(
