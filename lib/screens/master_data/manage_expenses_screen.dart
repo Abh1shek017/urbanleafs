@@ -171,7 +171,7 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
                 itemCount: _expenseTypes.length,
                 itemBuilder: (ctx, i) => Padding(
                   padding: const EdgeInsets.only(
-                    bottom: 12,
+                    bottom: 8,
                   ), // 🔹 add space between cards
                   child: StaggeredItem(
                     index: i,
@@ -181,7 +181,7 @@ class _ManageExpensesScreenState extends State<ManageExpensesScreen> {
                         children: [
                           Text(
                             _expenseTypes[i],
-                            style: Theme.of(context).textTheme.bodyLarge,
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
                           if (isAdmin)
                             IconButton(

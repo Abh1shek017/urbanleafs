@@ -552,13 +552,13 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     return RefreshIndicator(
       onRefresh: isAdmin ? _refreshFromFirestore : () async {},
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(10),
         child: _inventoryItems.isEmpty
             ? const Center(child: Text('No inventory items found. Add some!'))
             : ListView.separated(
                 itemCount: _inventoryItems.length,
                 separatorBuilder: (_, __) =>
-                    const SizedBox(height: 12), // space between cards
+                    const SizedBox(height: 5), // space between cards
                 itemBuilder: (ctx, i) {
                   final item = _inventoryItems[i];
                   return GlassCard(
@@ -575,8 +575,8 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                                   item['name'],
                                   style: Theme.of(context)
                                       .textTheme
-                                      .headlineMedium
-                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                      .headlineSmall
+                                      ?.copyWith(fontWeight: FontWeight.w500),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
