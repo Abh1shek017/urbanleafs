@@ -17,11 +17,11 @@ class EditCustomerScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<EditCustomerScreen> createState() => _EditCustomerScreenState();
 }
-
 class _EditCustomerScreenState extends ConsumerState<EditCustomerScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late TextEditingController nameCtrl;
+  late TextEditingController shopCtrl; // <-- Added shop controller
   late TextEditingController phoneCtrl;
   late TextEditingController addressCtrl;
   late TextEditingController gstCtrl;
@@ -34,6 +34,7 @@ class _EditCustomerScreenState extends ConsumerState<EditCustomerScreen> {
   void initState() {
     super.initState();
     nameCtrl = TextEditingController(text: widget.customer.name);
+    shopCtrl = TextEditingController(text: widget.customer.shopName); // <-- init
     phoneCtrl = TextEditingController(text: widget.customer.phone);
     addressCtrl = TextEditingController(text: widget.customer.address);
     gstCtrl = TextEditingController(text: widget.customer.gstNumber ?? '');
@@ -84,6 +85,7 @@ class _EditCustomerScreenState extends ConsumerState<EditCustomerScreen> {
       final updatedCustomer = CustomerModel(
         id: widget.customer.id,
         name: nameCtrl.text.trim(),
+        shopName: shopCtrl.text.trim(), // <-- include shop name
         phone: phoneCtrl.text.trim(),
         address: addressCtrl.text.trim(),
         gstNumber: gstCtrl.text.trim().isEmpty ? null : gstCtrl.text.trim(),
@@ -172,6 +174,15 @@ class _EditCustomerScreenState extends ConsumerState<EditCustomerScreen> {
                 validator: (val) =>
                     val == null || val.trim().isEmpty ? "Required" : null,
               ),
+
+              GreenInputField(
+                label: "Shop Name",   // <-- Added field
+                icon: Icons.store_outlined,
+                controller: shopCtrl,
+                validator: (val) =>
+                    val == null || val.trim().isEmpty ? "Required" : null,
+              ),
+
               GreenInputField(
                 label: "Mobile Number",
                 icon: Icons.phone_android,
@@ -181,6 +192,7 @@ class _EditCustomerScreenState extends ConsumerState<EditCustomerScreen> {
                     ? "Enter 10-digit number"
                     : null,
               ),
+
               GreenInputField(
                 label: "Address",
                 icon: Icons.home_outlined,
@@ -189,6 +201,7 @@ class _EditCustomerScreenState extends ConsumerState<EditCustomerScreen> {
                 validator: (val) =>
                     val == null || val.trim().isEmpty ? "Required" : null,
               ),
+
               GreenInputField(
                 label: "GST Number (Optional)",
                 icon: Icons.confirmation_number_outlined,

@@ -25,6 +25,7 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
   File? _selectedImage;
   bool isSubmitting = false;
   String? errorMessage;
+  String shopName = '';
 
   Future<void> _pickImage() async {
     final picked = await ImagePicker().pickImage(
@@ -39,9 +40,9 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
   Future<String?> _uploadProfilePicture(String customerId) async {
     if (_selectedImage == null) return null;
     try {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('customer_images/$customerId.jpg');
+      final storageRef = FirebaseStorage.instance.ref().child(
+        'customer_images/$customerId.jpg',
+      );
       final uploadTask = await storageRef.putFile(_selectedImage!);
       return await uploadTask.ref.getDownloadURL();
     } catch (e) {
@@ -68,7 +69,8 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
     });
 
     try {
-      final customerId = '${name.trim().replaceAll(' ', '_').toLowerCase()}_${phone.trim().substring(phone.trim().length - 5)}';
+      final customerId =
+          '${name.trim().replaceAll(' ', '_').toLowerCase()}_${phone.trim().substring(phone.trim().length - 5)}';
       final user = ref.read(authStateProvider).value;
       final addedByName = await _fetchUsernameFromUid(user?.uid ?? 'unknown');
       final profileUrl = await _uploadProfilePicture(customerId);
@@ -81,6 +83,7 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
         gstNumber: gst.trim().isEmpty ? null : gst.trim(),
         profileImageUrl: profileUrl,
         addedBy: addedByName,
+        shopName: shopName.trim(), // ← new field
         createdAt: Timestamp.now(),
       );
 
@@ -155,6 +158,13 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
                 validator: (val) =>
                     val == null || val.trim().isEmpty ? "Required" : null,
                 onSaved: (val) => name = val!,
+              ),
+              GreenInputField(
+                label: "Shop Name",
+                icon: Icons.store_outlined,
+                validator: (val) =>
+                    val == null || val.trim().isEmpty ? "Required" : null,
+                onSaved: (val) => shopName = val!,
               ),
 
               GreenInputField(

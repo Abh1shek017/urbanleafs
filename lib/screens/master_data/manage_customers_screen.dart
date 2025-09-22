@@ -31,21 +31,31 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     _loadCustomers();
   }
 
-  Future<void> _loadCustomers() async {
-    final snapshot = await _firestore.collection('customers').get();
-    final customers = snapshot.docs
-        .map((doc) => CustomerModel.fromMap(doc.data(), doc.id))
-        .toList();
+ Future<void> _loadCustomers() async {
+  final snapshot = await _firestore.collection('customers').get();
+  final customers = snapshot.docs
+      .map((doc) => CustomerModel.fromMap(doc.data(), doc.id))
+      .toList();
 
-    setState(() => _customers = customers);
+  setState(() => _customers = customers);
 
-    final jsonFile = File(
-      '${(await getApplicationDocumentsDirectory()).path}/customers.json',
-    );
-    await jsonFile.writeAsString(
-      jsonEncode(customers.map((e) => e.toMap()).toList()),
-    );
-  }
+  // When writing to JSON, convert Timestamp to ISO string
+  final jsonFile = File(
+    '${(await getApplicationDocumentsDirectory()).path}/customers.json',
+  );
+
+  final jsonList = customers.map((e) {
+    final map = e.toMap();
+    // Convert Timestamp to string for JSON only
+    map['createdAt'] = map['createdAt'] is Timestamp
+        ? (map['createdAt'] as Timestamp).toDate().toIso8601String()
+        : map['createdAt'];
+    return map;
+  }).toList();
+
+  await jsonFile.writeAsString(jsonEncode(jsonList));
+}
+
 
 Future<void> _deleteCustomer(String id) async {
   final shouldDelete = await showDialog<bool>(
@@ -131,88 +141,103 @@ Future<void> _deleteCustomer(String id) async {
                 return StaggeredItem(
                   index: i,
                   child: GlassCard(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Colors.grey[300],
-                          child:
-                              (customer.profileImageUrl != null &&
-                                  customer.profileImageUrl!.isNotEmpty)
-                              ? ClipOval(
-                                  child: CachedNetworkImage(
-                                    imageUrl: customer.profileImageUrl!,
-                                    fit: BoxFit.cover,
-                                    width: 60,
-                                    height: 60,
-                                    errorWidget: (context, url, error) =>
-                                        const Icon(
-                                          Icons.person,
-                                          size: 30,
-                                          color: Colors.black54,
-                                        ),
-                                    placeholder: (context, url) =>
-                                        const CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.person,
-                                  size: 30,
-                                  color: Colors.black54,
-                                ),
+  child: Padding(
+    padding: const EdgeInsets.all(12.0), // add inner padding
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 40, // bigger size
+          backgroundColor: Colors.grey[300],
+          child: (customer.profileImageUrl != null &&
+                  customer.profileImageUrl!.isNotEmpty)
+              ? ClipOval(
+                  child: CachedNetworkImage(
+                    imageUrl: customer.profileImageUrl!,
+                    fit: BoxFit.cover,
+                    width: 80,  // match radius * 2
+                    height: 80,
+                    errorWidget: (context, url, error) =>
+                        const Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Colors.black54,
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                customer.name,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 4),
-                              GestureDetector(
-                                onTap: () => _launchPhoneCall(customer.phone),
-                                child: Text(
-                                  customer.phone,
-                                  style: const TextStyle(color: Colors.blue),
-                                ),
-                              ),
-                              if (customer.gstNumber != null &&
-                                  customer.gstNumber!.trim().isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text("GST: ${customer.gstNumber}"),
-                                ),
-                              Text(customer.address),
-                            ],
-                          ),
+                    placeholder: (context, url) =>
+                        const CircularProgressIndicator(
+                          strokeWidth: 2,
                         ),
-                        if (isAdmin)
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.edit,
-                                  color: Colors.green,
-                                ),
-                                onPressed: () => _openEditScreen(customer),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.red,
-                                ),
-                                onPressed: () => _deleteCustomer(customer.id),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
                   ),
+                )
+              : const Icon(
+                  Icons.person,
+                  size: 40,
+                  color: Colors.black54,
+                ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                customer.name,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 2),
+              // Shop name
+              Text(
+                 customer.shopName.isNotEmpty 
+      ? customer.shopName 
+      : 'Shop Name not set',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: () => _launchPhoneCall(customer.phone),
+                child: Text(
+                  customer.phone,
+                  style: const TextStyle(color: Colors.blue),
+                ),
+              ),
+              if (customer.gstNumber != null &&
+                  customer.gstNumber!.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text("GST: ${customer.gstNumber}"),
+                ),
+              Text(customer.address),
+            ],
+          ),
+        ),
+        if (isAdmin)
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.edit,
+                  color: Colors.green,
+                ),
+                onPressed: () => _openEditScreen(customer),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.red,
+                ),
+                onPressed: () => _deleteCustomer(customer.id),
+              ),
+            ],
+          ),
+      ],
+    ),
+  ),
+),
+
                 );
               },
             ),

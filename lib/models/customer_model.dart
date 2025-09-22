@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 class CustomerModel {
   final String id;
   final String name;
   final String phone;
   final String address;
   final String? profileImageUrl;
-  final String? gstNumber; // <-- now optional
+  final String? gstNumber; // optional
+  final String shopName;   // <-- new optional field
   final String addedBy;
   final Timestamp createdAt;
 
@@ -15,7 +17,8 @@ class CustomerModel {
     required this.phone,
     required this.address,
     this.profileImageUrl,
-    this.gstNumber, // <-- not required
+    this.gstNumber,
+    required this.shopName,          // <-- initialize
     required this.addedBy,
     required this.createdAt,
   });
@@ -26,22 +29,25 @@ class CustomerModel {
       name: map['name'] ?? '',
       phone: map['phone'] ?? '',
       address: map['address'] ?? '',
-      profileImageUrl: map['profileUrl'] ?? '',
-      gstNumber: map['gstNumber'], // no default
+      profileImageUrl: map['profileUrl'], // keep optional
+      gstNumber: map['gstNumber'],        // optional
+      shopName: map['shopName'],          // <-- read from map
       addedBy: map['addedBy'] ?? '',
       createdAt: map['createdAt'] ?? Timestamp.now(),
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'phone': phone,
-      'address': address,
-      'profileUrl': profileImageUrl,
-      if (gstNumber != null && gstNumber!.isNotEmpty) 'gstNumber': gstNumber,
-      'addedBy': addedBy,
-      'createdAt': createdAt,
-    };
-  }
+  return {
+    'name': name,
+    'shopName': shopName,
+    'phone': phone,
+    'address': address,
+    if (gstNumber != null && gstNumber!.isNotEmpty) 'gstNumber': gstNumber,
+    'profileUrl': profileImageUrl,
+    'addedBy': addedBy,
+    'createdAt': createdAt,
+  };
+}
+
 }

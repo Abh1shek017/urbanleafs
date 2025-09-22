@@ -130,6 +130,7 @@ Widget _buildScrollableTab(Widget child) {
   );
 }
 
+
 @override
 Widget build(BuildContext context) {
   final customer = widget.customer;
@@ -166,94 +167,118 @@ Widget build(BuildContext context) {
   );
 }
 
-  Widget _buildHeader(dynamic customer) {
-    return Padding(
-      padding: const EdgeInsets.all(10),
-      child: Card(
-        color: const Color(0xFFEFEFEF), // slightly darker background
-        elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              customer.profileImageUrl?.isNotEmpty == true
-                  ? CircleAvatar(
-                      radius: 40,
-                      backgroundImage: NetworkImage(customer.profileImageUrl!),
-                    )
-                  : const CircleAvatar(
-                      radius: 40,
-                      child: Icon(Icons.person, size: 40),
-                    ),
-              const SizedBox(height: 8),
-              Text(
-                customer.name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Phone section
-                  GestureDetector(
-                    onTap: () async {
-                      final Uri phoneUri = Uri(
-                        scheme: 'tel',
-                        path: customer.phone,
-                      );
-                      if (await canLaunchUrl(phoneUri)) {
-                        await launchUrl(phoneUri);
-                      }
-                    },
-                    child: Row(
-                      children: [
-                        const Icon(Icons.phone, size: 18, color: Colors.blue),
-                        const SizedBox(width: 6),
-                        Text(
-                          customer.phone,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.blue,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ],
-                    ),
+Widget _buildHeader(dynamic customer) {
+  return Padding(
+    padding: const EdgeInsets.all(10),
+    child: Card(
+      color: const Color(0xFFEFEFEF),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Profile Image
+            customer.profileImageUrl?.isNotEmpty == true
+                ? CircleAvatar(
+                    radius: 40,
+                    backgroundImage: NetworkImage(customer.profileImageUrl!),
+                  )
+                : const CircleAvatar(
+                    radius: 40,
+                    child: Icon(Icons.person, size: 40),
                   ),
+            const SizedBox(height: 8),
 
-                  // Address section
-                  Row(
+            // Show Shop Name below the name, with placeholder if missing
+Padding(
+  padding: const EdgeInsets.only(top: 4, bottom: 8),
+  child: Text(
+    
+  (customer.shopName != null && customer.shopName!.isNotEmpty)
+      ? customer.shopName!
+      : 'Shop Name not set',
+  style: const TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w500,
+    color: Colors.black54,
+  ),
+),
+
+),
+
+
+            // Row: Phone | Customer Name | Address
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Phone
+                GestureDetector(
+                  onTap: () async {
+                    final Uri phoneUri = Uri(
+                      scheme: 'tel',
+                      path: customer.phone,
+                    );
+                    if (await canLaunchUrl(phoneUri)) {
+                      await launchUrl(phoneUri);
+                    }
+                  },
+                  child: Row(
                     children: [
-                      const Icon(Icons.home, size: 18, color: Colors.grey),
-                      const SizedBox(width: 4), // reduce gap if needed
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 150),
-                        child: Text(
-                          customer.address,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.black87,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 2,
-                          textAlign: TextAlign.right,
+                      const Icon(Icons.phone, size: 18, color: Colors.blue),
+                      const SizedBox(width: 6),
+                      Text(
+                        customer.phone,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.blue,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+
+                // Customer Name in middle
+                Text(
+                  customer.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+
+                // Address
+                Row(
+                  children: [
+                    const Icon(Icons.home, size: 18, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 100),
+                      child: Text(
+                        customer.address,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Colors.black87,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   Widget _buildFilterDropdown({
     required String label,

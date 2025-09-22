@@ -90,11 +90,14 @@ class DueRepository {
         final totalDue = totalOrderAmount - totalPaymentAmount;
 
         // 🔹 Step 4: Add to result
+        final shopName = data['shopName'] ?? ''; // or null if you prefer
+
         result.add(
           CustomerWithDue(
             name: name,
             phone: phone,
             profileImageUrl: profileUrl,
+            shopName: shopName, // <-- add this line
             address: address,
             totalDue: totalDue,
             dueOrders: dueOrders,
