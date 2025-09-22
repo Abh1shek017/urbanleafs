@@ -248,7 +248,6 @@ For support and questions:
 - Flutter team for the amazing framework
 - Firebase for backend services
 - Riverpod for state management
-- All contributors and beta testers
 
 ---
 
