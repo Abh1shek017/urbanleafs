@@ -41,7 +41,9 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
   @override
   Widget build(BuildContext context) {
     final dayName = DateFormat('EEEE').format(_currentTime); // e.g. Monday
-    final fullDate = DateFormat('dd MMMM yyyy').format(_currentTime); // e.g. 17 June 2025
+    final fullDate = DateFormat(
+      'dd MMMM yyyy',
+    ).format(_currentTime); // e.g. 17 June 2025
     final time = DateFormat('hh:mm a').format(_currentTime); // e.g. 07:35 PM
 
     return Center(
@@ -65,16 +67,22 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      fullDate,
-                      style: const TextStyle(fontSize: 16),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        fullDate,
+                        style: const TextStyle(fontSize: 16),
+                        overflow:
+                            TextOverflow.ellipsis, // adds "..." if too long
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
