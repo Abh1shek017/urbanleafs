@@ -7,7 +7,7 @@ import '../models/master_data_model.dart';
 
 class InventoryRepository extends BaseRepository {
   InventoryRepository()
-    : super(FirebaseFirestore.instance.collection('inventory'));
+      : super(FirebaseFirestore.instance.collection('inventory'));
 
   /// Stream of all inventory items (real-time)
   Stream<List<InventoryModel>> getAllInventory() {
@@ -32,11 +32,12 @@ class InventoryRepository extends BaseRepository {
     required String updatedBy,
     required num lowStockThreshold,
     required List<RecipeStep> recipe,
+    String? size, // ✅ size added
     bool preventNegative = true,
   }) async {
     final nowTs = Timestamp.now();
     final preparedId =
-        '${preparedName.replaceAll(' ', '')}_${unit.replaceAll(' ', '')}Prepared';
+        '${preparedName.replaceAll(' ', '')}_${unit.replaceAll(' ', '')}_Prepared${size != null ? "_${size.replaceAll(' ', '')}" : ""}';
     final preparedRef = collection.doc(preparedId);
 
     try {
@@ -54,9 +55,12 @@ class InventoryRepository extends BaseRepository {
             'unit': unit,
             'type': 'Prepared',
             'lowStockThreshold': lowStockThreshold,
-            'quantity': ((currentPrepared + preparedQty.toDouble()) * 100).roundToDouble() / 100,
+            'quantity': ((currentPrepared + preparedQty.toDouble()) * 100)
+                    .roundToDouble() /
+                100,
             'lastUpdated': nowTs,
             'updatedBy': updatedBy,
+            'size': size, // ✅ add size
           });
         } else {
           tx.set(preparedRef, {
@@ -64,30 +68,23 @@ class InventoryRepository extends BaseRepository {
             'unit': unit,
             'type': 'Prepared',
             'lowStockThreshold': lowStockThreshold,
-           'quantity': (preparedQty.toDouble() * 100).roundToDouble() / 100,
+            'quantity': (preparedQty.toDouble() * 100).roundToDouble() / 100,
             'createdAt': nowTs,
             'lastUpdated': nowTs,
             'updatedBy': updatedBy,
+            'size': size, // ✅ add size
           });
         }
 
         // ==== 2. ADD HISTORY ENTRY FOR PREPARED ITEM ====
         String _historyId(String itemName, String actionType, num qty) {
           final safeName = itemName.replaceAll(' ', '');
-          final qtyStr = qty % 1 == 0
-              ? qty.toInt().toString()
-              : qty.toStringAsFixed(1);
-          final formattedDate = DateFormat(
-            'yyyyMMdd_HHmmss',
-          ).format(DateTime.now());
+          final qtyStr = qty % 1 == 0 ? qty.toInt().toString() : qty.toStringAsFixed(1);
+          final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
           return '${safeName}_$actionType$qtyStr$formattedDate';
         }
 
-        final histIdPrepared = _historyId(
-          preparedName,
-          'prepared',
-          preparedQty,
-        );
+        final histIdPrepared = _historyId(preparedName, 'prepared', preparedQty);
         tx.set(preparedRef.collection('history').doc(histIdPrepared), {
           'type': 'restock',
           'quantity': (preparedQty * 100).roundToDouble() / 100,
@@ -96,11 +93,10 @@ class InventoryRepository extends BaseRepository {
         });
 
         // ==== 3. VALIDATE AND DEDUCT RAW MATERIALS ====
-        // debugPrint('📋 Recipe being used for "$preparedName":');
         for (final step in recipe) {
           final rawName = step.rawName.trim();
           final consumeQty = (preparedQty * step.ratio).toDouble();
-          // debugPrint('➡️ Raw: "${step.rawName.trim()}", Ratio: ${step.ratio}');
+
           final rawQuery = await collection
               .where('itemName', isEqualTo: rawName)
               .where('type', isEqualTo: 'Raw Material')
@@ -108,7 +104,6 @@ class InventoryRepository extends BaseRepository {
               .get();
 
           if (rawQuery.docs.isEmpty) {
-            // debugPrint('❌ Raw material "$rawName" not found in inventory.');
             throw StateError('Raw material "$rawName" not found.');
           }
 
@@ -118,22 +113,18 @@ class InventoryRepository extends BaseRepository {
           final currentRaw = (rawData['quantity'] as num?)?.toDouble() ?? 0.0;
           final newQty = currentRaw - consumeQty;
 
-          // debugPrint('🔄 Consuming $consumeQty of $rawName (available: $currentRaw)');
-
           if (preventNegative && newQty < 0) {
             throw StateError(
               'Insufficient "$rawName" stock. Needed $consumeQty, available $currentRaw.',
             );
           }
 
-          // Update inventory
           tx.update(rawRef, {
             'quantity': (newQty * 100).roundToDouble() / 100,
             'lastUpdated': nowTs,
             'updatedBy': updatedBy,
           });
 
-          // Add history
           final histIdRaw = _historyId(rawName, 'consume', consumeQty);
           tx.set(rawRef.collection('history').doc(histIdRaw), {
             'type': 'consume',
@@ -144,10 +135,7 @@ class InventoryRepository extends BaseRepository {
           });
         }
       });
-
-      // debugPrint('✅ Prepared item "$preparedName" added and raw materials deducted.');
     } catch (e) {
-      // debugPrint('🔥 Failed to add prepared item: $e\n$st');
       rethrow;
     }
   }
@@ -166,18 +154,18 @@ class InventoryRepository extends BaseRepository {
     final itemName = inventoryData['itemName'] as String? ?? '';
     final unit = inventoryData['unit'] as String? ?? '';
     final type = inventoryData['type'] as String? ?? 'Raw Material';
+    final size = inventoryData['size'] as String?; // ✅ size added
     final quantityToAdd =
         (inventoryData['quantity'] as num?)?.toDouble() ?? 0.0;
 
-    // 🔹 Custom document ID
+    // 🔹 Custom document ID includes size
     final customDocId =
-        '${itemName.replaceAll(' ', '')}_${unit.replaceAll(' ', '')}_${type.replaceAll(' ', '')}';
+        '${itemName.replaceAll(' ', '')}_${unit.replaceAll(' ', '')}_${type.replaceAll(' ', '')}${size != null ? "_${size.replaceAll(' ', '')}" : ""}';
 
     final docRef = collection.doc(customDocId);
     final existingDoc = await docRef.get();
 
     if (existingDoc.exists) {
-      // ✅ Item exists: update quantity
       final existingData = existingDoc.data() as Map<String, dynamic>? ?? {};
       final existingQuantity =
           (existingData['quantity'] as num?)?.toDouble() ?? 0.0;
@@ -189,22 +177,16 @@ class InventoryRepository extends BaseRepository {
         'updatedBy': inventoryData['updatedBy'],
         'type': inventoryData['type'],
         'unit': inventoryData['unit'],
+        'size': size, // ✅ add size
         'lowStockThreshold': inventoryData['lowStockThreshold'],
       });
 
-      // ✅ Add history entry
-      final itemName =
-          inventoryData['itemName']?.toString().replaceAll(' ', '_') ?? 'item';
-      final type = 'restock';
-      final quantityStr = quantityToAdd.toString();
-
-      final formattedDate = DateFormat(
-        'yyyyMMdd_HHmmss',
-      ).format(DateTime.now());
-      final customId = '${itemName}_$type${quantityStr}_$formattedDate';
+      final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final customId =
+          '${itemName.replaceAll(' ', '_')}_restock${quantityToAdd}_$formattedDate';
 
       await docRef.collection('history').doc(customId).set({
-        'type': type,
+        'type': 'restock',
         'quantity': quantityToAdd,
         'timestamp': Timestamp.now(),
         'addedBy': inventoryData['updatedBy'],
@@ -215,26 +197,19 @@ class InventoryRepository extends BaseRepository {
         'quantity': newQuantity,
       });
     } else {
-      // ✅ Item does not exist: create new
-      await docRef.set(inventoryData);
+      await docRef.set({
+        ...inventoryData,
+        'size': size, // ✅ add size
+      });
 
-      final itemName =
-          inventoryData['itemName']?.toString().replaceAll(' ', '_') ?? 'item';
-      final type = 'restock';
-      final quantityStr = quantityToAdd.toString();
-
-      // Format: yyyyMMdd_HHmmss (e.g., 20250730_235959)
-      final formattedDate = DateFormat(
-        'yyyyMMdd_HHmmss',
-      ).format(DateTime.now());
-
-      final customId = '${itemName}_$type${quantityStr}_$formattedDate';
+      final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final customId =
+          '${itemName.replaceAll(' ', '_')}_restock${quantityToAdd}_$formattedDate';
 
       await docRef.collection('history').doc(customId).set({
-        'type': type,
+        'type': 'restock',
         'quantity': quantityToAdd,
-        'timestamp':
-            Timestamp.now(), // use 'timestamp' for consistency with your model
+        'timestamp': Timestamp.now(),
         'addedBy': inventoryData['updatedBy'],
       });
 
@@ -264,12 +239,13 @@ class InventoryRepository extends BaseRepository {
 
       final itemName = inventoryData['itemName'] as String? ?? 'Unknown Item';
       final unit = inventoryData['unit'] as String? ?? 'units';
+      final size = inventoryData['size'] as String?;
 
       if (quantity <= lowStockThreshold) {
         await addNotification(
           'inventory',
           'Low Inventory',
-          '$itemName low: only $quantity $unit left',
+          '$itemName${size != null ? " ($size)" : ""} low: only $quantity $unit left',
         );
       }
     } catch (e) {

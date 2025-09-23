@@ -2,13 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:urbanleafs/screens/inventory/add_inventory_screen.dart';
 import '../../models/inventory_model.dart';
 import '../../providers/inventory_provider.dart';
 import '../../repositories/inventory_repository.dart';
 import '../../services/master_data_service.dart';
-import '../../utils/notifications_util.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import 'package:intl/intl.dart';
@@ -187,6 +185,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
         ),
       );
     }
+
     return LayoutBuilder(
       builder: (ctx, constraints) {
         final maxWidth = constraints.maxWidth;
@@ -231,87 +230,81 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 300),
                 opacity: isSelected ? 0.6 : 1,
-                child: Slidable(
-                  key: ValueKey(item.id),
-                  endActionPane: ActionPane(
-                    extentRatio: 0.4,
-                    motion: const DrawerMotion(),
-                    children: [
-                      SlidableAction(
-                        onPressed: (_) => _restockItem(item),
-                        icon: Icons.restore,
-                        label: 'Restock',
-                        backgroundColor: Colors.green,
-                      ),
-                      // SlidableAction(
-                      //   onPressed: (_) => InventoryRepository().deleteInventory(item.id),
-                      //   icon: Icons.delete,
-                      //   label: 'Delete',
-                      //   backgroundColor: Colors.red,
-                      // ),
-                    ],
+                child: Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Stack(
-                      children: [
-                        // left stripe
-                        Positioned.fill(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Container(width: 4, color: stripeColor),
-                          ),
+                  child: Stack(
+                    children: [
+                      // left stripe
+                      Positioned.fill(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(width: 4, color: stripeColor),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // header + badge
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      item.itemName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Top section
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        item.itemName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
+                                    ),
+                                    Icon(
+                                      isLow
+                                          ? Icons.warning_amber_rounded
+                                          : Icons.check_circle_outline,
+                                      color: isLow ? Colors.red : Colors.green,
+                                      size: 18,
+                                    ),
+                                  ],
+                                ),
+                                if (item.size != null &&
+                                    item.size!.isNotEmpty) ...[
+                                  const SizedBox(height: .5),
+                                  Text(
+                                    '${item.size} inch',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  Icon(
-                                    isLow
-                                        ? Icons.warning_amber_rounded
-                                        : Icons.check_circle_outline,
-                                    color: isLow ? Colors.red : Colors.green,
-                                    size: 18,
-                                  ),
                                 ],
-                              ),
+                                const SizedBox(height: .8),
+                                Text(
+                                  'Qty: ${item.quantity.toStringAsFixed(1)} ${item.unit}',
+                                ),
+                                Text(
+                                  'Type: ${item.type.toUpperCase()}',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
+                            ),
 
-                              const SizedBox(height: 7),
-                              Text(
-                                'Qty: ${item.quantity.toStringAsFixed(1)} ${item.unit}',
-                              ),
-                              Text(
-                                'Type: ${item.type.toUpperCase()}',
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                              const Spacer(),
-                              Text(
-                                'Restocked: ${DateFormat.yMMMd().format(item.lastUpdated)}',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ],
-                          ),
+                            // Bottom section
+                            Text(
+                              'Restocked: ${DateFormat.yMMMd().format(item.lastUpdated)}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -322,26 +315,41 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     );
   }
 
-  Widget _buildShimmerGrid() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 200,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1,
-      ),
-      itemCount: 8,
-      itemBuilder: (_, __) => Shimmer.fromColors(
-        baseColor: Colors.grey.shade300,
-        highlightColor: Colors.grey.shade100,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+  Widget _buildShimmerGrid({int itemCount = 8}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final crossAxisCount = (maxWidth / 200).clamp(2, 4).toInt();
+
+        final tileWidth =
+            (maxWidth - (12 * (crossAxisCount - 1))) / crossAxisCount;
+
+        // 🔹 Adjust this multiplier to control height
+        final tileHeight = tileWidth * 1.2;
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(10),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: tileWidth / tileHeight,
           ),
-        ),
-      ),
+          itemCount: itemCount,
+          itemBuilder: (_, __) => Shimmer.fromColors(
+            baseColor: Colors.grey.shade300,
+            highlightColor: Colors.grey.shade100,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -475,16 +483,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
     );
   }
 
-  void _restockItem(InventoryModel item) {
-    final userId = ref.read(authStateProvider).value!.uid;
-    InventoryRepository().updateInventory(item.id, {
-      'quantity': item.lowStockThreshold * 2,
-      'lastUpdated': Timestamp.now(),
-      'updatedBy': userId,
-    });
-    addNotification('inventory', 'Restocked', '${item.itemName} restocked');
-  }
-
   void _showDetailSheet(BuildContext ctx, InventoryModel item) {
     showModalBottomSheet(
       context: ctx,
@@ -504,19 +502,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                   vertical: 24,
                 ),
                 children: [
-                  // Header
-                  Text(
-                    item.itemName,
-                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  // Header with Name + Size (Bold)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${item.itemName} (${item.size})',
+                          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'ID: ${item.id}',
-                    style: Theme.of(ctx).textTheme.bodyMedium,
-                  ),
-                  const Divider(height: 32),
+                  const SizedBox(height: 16),
 
                   // Quantity & Type
                   Row(
@@ -593,7 +593,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                       ),
                     ],
                   ),
-
                   const Divider(height: 32),
 
                   // Stock History
@@ -629,14 +628,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
                                           ? Colors.green
                                           : Colors.red;
 
-                                      // Determine label based on type
                                       final label = entry.type == 'restock'
                                           ? 'Restocked'
                                           : item.type == 'Prepared'
                                           ? 'Order'
                                           : 'Used';
 
-                                      // Format quantity
                                       final quantityText =
                                           entry.quantity % 1 == 0
                                           ? entry.quantity.toInt().toString()

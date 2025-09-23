@@ -23,6 +23,8 @@ class _AddInventoryBottomSheetState
   final TextEditingController _typeCtrl = TextEditingController();
 
   String? selectedItemName;
+  String? selectedSize;
+  List<String> availableSizes = [];
   int quantity = 0;
   int lowStockThreshold = 10;
   bool _saving = false;
@@ -56,17 +58,29 @@ class _AddInventoryBottomSheetState
           Center(child: Text('Error loading master data: $error')),
       data: (masterData) {
         final inventoryTypes = masterData.inventoryTypes;
-        final itemNames = inventoryTypes
+        final uniqueNames = inventoryTypes
             .map((e) => e.name)
             .where((e) => e.isNotEmpty)
+            .toSet()
             .toList();
 
         // Initialize default once
-        if (selectedItemName == null && itemNames.isNotEmpty) {
-          selectedItemName = itemNames.first;
+        if (selectedItemName == null && uniqueNames.isNotEmpty) {
+          selectedItemName = uniqueNames.first;
           final meta = _findByName(inventoryTypes, selectedItemName);
           _unitCtrl.text = (meta?.unit ?? '').capitalize();
           _typeCtrl.text = (meta?.type ?? '').capitalize();
+
+          // populate sizes
+          availableSizes = inventoryTypes
+              .where(
+                (e) =>
+                    e.name.toLowerCase().trim() ==
+                    selectedItemName!.toLowerCase().trim(),
+              )
+              .map((e) => e.size)
+              .toSet()
+              .toList();
         }
 
         return SafeArea(
@@ -87,7 +101,7 @@ class _AddInventoryBottomSheetState
                         labelText: 'Item Name',
                         border: OutlineInputBorder(),
                       ),
-                      items: itemNames
+                      items: uniqueNames
                           .map(
                             (item) => DropdownMenuItem(
                               value: item,
@@ -98,6 +112,20 @@ class _AddInventoryBottomSheetState
                       onChanged: (val) {
                         setState(() {
                           selectedItemName = val;
+                          selectedSize = null; // reset size
+                          availableSizes = inventoryTypes
+                              .where(
+                                (e) =>
+                                    e.name.toLowerCase().trim() ==
+                                    selectedItemName!.toLowerCase().trim(),
+                              )
+                              .map((e) => e.size)
+                              .toSet()
+                              .toList();
+                          selectedSize = availableSizes.isNotEmpty
+                              ? availableSizes.first
+                              : null;
+
                           final meta = _findByName(inventoryTypes, val);
                           _unitCtrl.text = (meta?.unit ?? '').capitalize();
                           _typeCtrl.text = (meta?.type ?? '').capitalize();
@@ -108,20 +136,53 @@ class _AddInventoryBottomSheetState
                     ),
                     const SizedBox(height: 12),
 
-                    TextFormField(
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantity',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Required';
-                        if (int.tryParse(value) == null) {
-                          return 'Enter valid number';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) => quantity = int.parse(value!),
+                    // Row for Quantity + Size
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Quantity',
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty)
+                                return 'Required';
+                              if (int.tryParse(value) == null)
+                                return 'Enter valid number';
+                              return null;
+                            },
+                            onSaved: (value) => quantity = int.parse(value!),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selectedSize,
+                            decoration: const InputDecoration(
+                              labelText: 'Size',
+                              border: OutlineInputBorder(),
+                            ),
+                            items: availableSizes
+                                .map(
+                                  (size) => DropdownMenuItem(
+                                    value: size,
+                                    child: Text(size),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                selectedSize = val;
+                              });
+                            },
+                            validator: (val) => (val == null || val.isEmpty)
+                                ? 'Required'
+                                : null, // optional if needed
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
 
@@ -173,7 +234,7 @@ class _AddInventoryBottomSheetState
                               _formKey.currentState!.save();
 
                               if (selectedItemName == null ||
-                                  !itemNames.contains(selectedItemName)) {
+                                  !uniqueNames.contains(selectedItemName)) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text('Please select an item'),
@@ -202,9 +263,8 @@ class _AddInventoryBottomSheetState
 
                               setState(() => _saving = true);
                               try {
-                                if (meta.type.trim() == 'Prepared'){
+                                if (meta.type.trim() == 'Prepared') {
                                   if (meta.recipe.isEmpty) {
-                                    // Decide: block or allow simple add
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
@@ -232,6 +292,8 @@ class _AddInventoryBottomSheetState
                                     'lowStockThreshold': lowStockThreshold,
                                     'lastUpdated': Timestamp.now(),
                                     'updatedBy': userId,
+                                    if (selectedSize != null)
+                                      'size': selectedSize,
                                   };
                                   await repository.addInventory(itemData);
                                 }

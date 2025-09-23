@@ -91,7 +91,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     final nameController = TextEditingController();
     final unitController = TextEditingController();
     final typeController = TextEditingController();
-    final sizeController = TextEditingController(); // Added size controller
+    final sizeController = TextEditingController();
 
     await showDialog(
       context: context,
@@ -107,7 +107,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.greenAccent.withValues(alpha: .3),
+                color: Colors.greenAccent.withValues(alpha: 0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -149,7 +149,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: sizeController, // Size input
+                  controller: sizeController,
                   decoration: const InputDecoration(
                     labelText: "Size",
                     border: OutlineInputBorder(),
@@ -180,32 +180,40 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                         final name = nameController.text.trim();
                         final unit = unitController.text.trim();
                         final type = typeController.text.trim();
-                        final size = sizeController.text.trim(); // Capture size
+                        final size = sizeController.text.trim().isEmpty
+                            ? 'N/A' // default if empty
+                            : sizeController.text.trim();
 
-                        if (name.isEmpty ||
-                            unit.isEmpty ||
-                            type.isEmpty ||
-                            size.isEmpty) {
-                          _showError("All fields are required.");
+                        if (name.isEmpty || unit.isEmpty || type.isEmpty) {
+                          _showError("Name, Unit, and Type are required.");
                           return;
                         }
 
-                        final isDuplicate = _inventoryItems.any(
-                          (item) =>
-                              item['name'].toString().toLowerCase() ==
-                              name.toLowerCase(),
-                        );
+                        // Check duplicates including size
+                        final isDuplicate = _inventoryItems.any((item) {
+                          final existingName = item['name']
+                              .toString()
+                              .toLowerCase();
+                          final existingSize = (item['size']?.toString() ?? '')
+                              .toLowerCase();
+
+                          return existingName == name.toLowerCase() &&
+                              existingSize == size.toLowerCase();
+                        });
 
                         if (isDuplicate) {
-                          _showError("This item already exists.");
+                          _showError(
+                            "This item with the same size already exists.",
+                          );
                           return;
                         }
 
+                        // Create new item
                         final newItem = {
                           'name': name,
                           'unit': unit,
                           'type': type,
-                          'size': size, // Save size
+                          'size': size, // always present
                         };
 
                         final updatedList = [..._inventoryItems, newItem];
@@ -238,7 +246,9 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     final nameController = TextEditingController(text: item['name'] ?? '');
     final unitController = TextEditingController(text: item['unit'] ?? '');
     final typeController = TextEditingController(text: item['type'] ?? '');
-    final sizeController = TextEditingController(text: item['size'] ?? '');
+    final sizeController = TextEditingController(
+      text: item['size'] ?? '',
+    ); // Size
 
     await showDialog(
       context: context,
@@ -327,27 +337,31 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                         final name = nameController.text.trim();
                         final unit = unitController.text.trim();
                         final type = typeController.text.trim();
-                        final size = sizeController.text.trim();
+                        final size = sizeController.text.trim().isEmpty
+                            ? 'N/A'
+                            : sizeController.text.trim(); // Default N/A
 
-                        if (name.isEmpty ||
-                            unit.isEmpty ||
-                            type.isEmpty ||
-                            size.isEmpty) {
-                          _showError("All fields are required.");
+                        if (name.isEmpty || unit.isEmpty || type.isEmpty) {
+                          _showError("Name, Unit, and Type are required.");
                           return;
                         }
 
-                        // Check duplicate names except current item
-                        final isDuplicate = _inventoryItems.any(
-                          (otherItem) =>
-                              otherItem != item &&
-                              otherItem['name'].toString().toLowerCase() ==
-                                  name.toLowerCase(),
-                        );
+                        // Check duplicate names except current item, including size
+                        final isDuplicate = _inventoryItems.any((otherItem) {
+                          if (otherItem == item) return false;
+                          final existingName = otherItem['name']
+                              .toString()
+                              .toLowerCase();
+                          final existingSize =
+                              (otherItem['size']?.toString() ?? '')
+                                  .toLowerCase();
+                          return existingName == name.toLowerCase() &&
+                              existingSize == size.toLowerCase();
+                        });
 
                         if (isDuplicate) {
                           _showError(
-                            "Another item with this name already exists.",
+                            "Another item with the same name and size already exists.",
                           );
                           return;
                         }
@@ -396,37 +410,53 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     await _service.updateMasterField('inventoryTypes', updatedList);
   }
 
-  Future<void> _saveRecipeForSelected() async {
-    if (_selectedPreparedItem == null) return;
+ Future<void> _saveRecipeForSelected() async {
+  if (_selectedPreparedItem == null) return;
 
-    final name = _selectedPreparedItem!['name'];
-    // Update in local _inventoryItems by name match
-    final idx = _inventoryItems.indexWhere((e) => (e['name'] ?? '') == name);
-    if (idx == -1) return;
+  final selectedName = _selectedPreparedItem!['name']?.toString();
+  final selectedSize = _selectedPreparedItem!['size']?.toString() ?? 'N/A';
 
-    final updatedItem = Map<String, dynamic>.from(_inventoryItems[idx]);
-    updatedItem['recipe'] = _recipeSteps;
+  if (selectedName == null) return;
 
-    final updatedList = List<Map<String, dynamic>>.from(_inventoryItems);
-    updatedList[idx] = updatedItem;
+  // Find the index of the exact prepared item (name + size)
+  final idx = _inventoryItems.indexWhere((e) =>
+      (e['name'] ?? '').toString() == selectedName &&
+      (e['size'] ?? 'N/A').toString() == selectedSize);
 
-    setState(() => _inventoryItems = updatedList);
-    await _service.updateMasterField('inventoryTypes', updatedList);
-  }
+  if (idx == -1) return;
+
+  // Update recipe steps only for this item
+  final updatedItem = Map<String, dynamic>.from(_inventoryItems[idx]);
+  updatedItem['recipe'] = _recipeSteps;
+
+  final updatedList = List<Map<String, dynamic>>.from(_inventoryItems);
+  updatedList[idx] = updatedItem;
+
+  setState(() => _inventoryItems = updatedList);
+  await _service.updateMasterField('inventoryTypes', updatedList);
+}
+
 
   void _selectPreparedByName(String? name) {
     if (name == null) return;
-    final found = _inventoryItems.firstWhere(
-      (e) =>
-          (e['type'] ?? '').toString().toLowerCase() == 'prepared' &&
-          (e['name'] ?? '') == name,
-      orElse: () => {},
-    );
+
+    // Get all items with this name and type 'prepared'
+    final matchedItems = _inventoryItems
+        .where(
+          (e) =>
+              (e['type'] ?? '').toString().toLowerCase() == 'prepared' &&
+              (e['name'] ?? '') == name,
+        )
+        .toList();
+
     setState(() {
-      if (found.isNotEmpty) {
-        _selectedPreparedItem = found;
+      if (matchedItems.isNotEmpty) {
+        // Pick the first size by default for editing
+        _selectedPreparedItem = matchedItems.first;
+
+        // Load recipe steps only for this size (for adding/deleting steps)
         _recipeSteps = List<Map<String, dynamic>>.from(
-          found['recipe'] ?? const [],
+          _selectedPreparedItem!['recipe'] ?? [],
         );
       } else {
         _selectedPreparedItem = null;
@@ -435,102 +465,160 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
     });
   }
 
-  Future<void> _addRecipeStepDialog() async {
-    if (_selectedPreparedItem == null) {
-      _showError('Select a prepared item first.');
-      return;
-    }
+Future<void> _addRecipeStepDialog() async {
+  if (_selectedPreparedItem == null) {
+    _showError('Select a prepared item first.');
+    return;
+  }
 
-    final rawItems = _rawItems;
-    if (rawItems.isEmpty) {
-      _showError('No raw material items found in master data.');
-      return;
-    }
+  final rawItems = _rawItems;
+  if (rawItems.isEmpty) {
+    _showError('No raw material items found in master data.');
+    return;
+  }
 
-    String? selectedRawName;
-    final ratioCtrl = TextEditingController();
+  String? selectedRawName;
+  final ratioCtrl = TextEditingController();
 
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Recipe Step'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Raw Material',
-                border: OutlineInputBorder(),
-              ),
-              value: selectedRawName,
-              items: rawItems.map<DropdownMenuItem<String>>((e) {
-                final name = (e['name'] ?? '').toString();
-                return DropdownMenuItem<String>(value: name, child: Text(name));
-              }).toList(),
-              onChanged: (val) {
-                selectedRawName = val;
-              },
+  // Prepare sizes of this prepared item name
+  final sizes = _inventoryItems
+      .where((e) =>
+          (e['type'] ?? '').toString().toLowerCase() == 'prepared' &&
+          (e['name'] ?? '') == _selectedPreparedItem!['name'])
+      .map((e) => e['size']?.toString() ?? 'N/A')
+      .toList();
+
+  String selectedSize = _selectedPreparedItem!['size']?.toString() ?? 'N/A';
+
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Add Recipe Step'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+            // Raw material selection
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Raw Material',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ratioCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(
-                labelText: 'Ratio (per 1 prepared unit)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            value: selectedRawName,
+            items: rawItems.map((e) {
+              final name = (e['name'] ?? '').toString();
+              return DropdownMenuItem(value: name, child: Text(name));
+            }).toList(),
+            onChanged: (val) => selectedRawName = val,
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Add'),
+          const SizedBox(height: 12),
+
+          // Size selection dropdown
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Prepared Item Size',
+              border: OutlineInputBorder(),
+            ),
+            value: selectedSize,
+            items: sizes
+                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) selectedSize = val;
+            },
+          ),
+          const SizedBox(height: 12),
+
+        
+          // Ratio input
+          TextField(
+            controller: ratioCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Ratio (per 1 prepared unit)',
+              border: OutlineInputBorder(),
+            ),
           ),
         ],
       ),
-    );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Add'),
+        ),
+      ],
+    ),
+  );
 
-    if (ok == true) {
-      final ratio = double.tryParse(ratioCtrl.text.trim());
-      if ((selectedRawName == null || selectedRawName!.isEmpty) ||
-          ratio == null) {
-        _showError('Select a raw material and enter a numeric ratio.');
-        return;
-      }
-
-      // Optional: prevent duplicates for the same rawName
-      final alreadyExists = _recipeSteps.any(
-        (s) => (s['rawName'] ?? '').toString() == selectedRawName,
-      );
-      if (alreadyExists) {
-        _showError('This raw material is already in the recipe.');
-        return;
-      }
-
-      setState(() {
-        _recipeSteps = [
-          ..._recipeSteps,
-          {'rawName': selectedRawName, 'ratio': ratio},
-        ];
-      });
-      await _saveRecipeForSelected();
+  if (ok == true) {
+    final ratio = double.tryParse(ratioCtrl.text.trim());
+    if (selectedRawName == null || selectedRawName!.isEmpty || ratio == null) {
+      _showError('Select a raw material and enter a numeric ratio.');
+      return;
     }
-  }
 
-  void _deleteRecipeStep(int index) async {
+    // Find the item for the selected size
+    final item = _inventoryItems.firstWhere(
+        (e) =>
+            (e['name'] ?? '') == _selectedPreparedItem!['name'] &&
+            (e['size'] ?? 'N/A') == selectedSize,
+        orElse: () => {});
+
+    if (item.isEmpty) return;
+
+    final currentSteps = List<Map<String, dynamic>>.from(item['recipe'] ?? []);
+
+    // Prevent duplicate raw material in same size
+    if (currentSteps.any((s) => (s['rawName'] ?? '') == selectedRawName)) {
+      _showError('This raw material is already in the recipe for this size.');
+      return;
+    }
+
+    currentSteps.add({'rawName': selectedRawName, 'ratio': ratio});
+
+    // Update the selected item
+    setState(() {
+      _recipeSteps = currentSteps;
+      _selectedPreparedItem = Map<String, dynamic>.from(item)
+        ..['recipe'] = currentSteps;
+    });
+
+    await _saveRecipeForSelected();
+  }
+}
+
+
+void _deleteRecipeStep(int index) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Confirm Delete'),
+      content: const Text('Are you sure you want to delete this recipe step?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirm == true) {
     setState(() {
       _recipeSteps = List<Map<String, dynamic>>.from(_recipeSteps)
         ..removeAt(index);
     });
     await _saveRecipeForSelected();
   }
+}
 
   void _showError(String message) {
     showDialog(
@@ -564,7 +652,7 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                   return GlassCard(
                     onTap: null,
                     child: Padding(
-                      padding: const EdgeInsets.all(5), // inner padding
+                      padding: const EdgeInsets.all(1), // inner padding
                       child: Row(
                         children: [
                           Expanded(
@@ -643,11 +731,23 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
   }
 
   Widget _buildRecipesTab(bool isAdmin) {
-    // Build prepared items list
-    final List<Map<String, dynamic>> preparedItems = _inventoryItems
+    // Get unique prepared item names
+    final uniqueNames = _inventoryItems
         .where((e) => (e['type'] ?? '').toString().toLowerCase() == 'prepared')
-        .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+        .map((e) => e['name']?.toString() ?? '')
+        .toSet()
         .toList();
+
+    // Recipes grouped by size for the selected prepared item
+    final recipesForSelectedName = _selectedPreparedItem == null
+        ? []
+        : _inventoryItems
+              .where(
+                (e) =>
+                    (e['type'] ?? '').toString().toLowerCase() == 'prepared' &&
+                    (e['name'] ?? '') == _selectedPreparedItem!['name'],
+              )
+              .toList();
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -663,17 +763,18 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
                     labelText: 'Prepared Item',
                     border: OutlineInputBorder(),
                   ),
-                  items: preparedItems.map<DropdownMenuItem<String>>((
-                    Map<String, dynamic> e,
-                  ) {
-                    final name = (e['name'] ?? '').toString();
-                    return DropdownMenuItem<String>(
-                      value: name,
-                      child: Text(name),
-                    );
-                  }).toList(),
+                  items: uniqueNames
+                      .map(
+                        (name) => DropdownMenuItem<String>(
+                          value: name,
+                          child: Text(name),
+                        ),
+                      )
+                      .toList(),
                   onChanged: isAdmin
-                      ? (val) => _selectPreparedByName(val)
+                      ? (val) {
+                          if (val != null) _selectPreparedByName(val);
+                        }
                       : null,
                 ),
               ),
@@ -692,31 +793,66 @@ class _ManageInventoryScreenState extends State<ManageInventoryScreen>
           Expanded(
             child: _selectedPreparedItem == null
                 ? const Center(child: Text('No prepared item selected'))
-                : (_recipeSteps.isEmpty
+                : (recipesForSelectedName.isEmpty
                       ? const Center(
                           child: Text('No recipe steps. Add some using +'),
                         )
                       : ListView.separated(
-                          itemCount: _recipeSteps.length,
+                          itemCount: recipesForSelectedName.length,
                           separatorBuilder: (context, __) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (ctx, i) {
-                            final step = _recipeSteps[i];
+                              const SizedBox(height: 12),
+                          itemBuilder: (ctx, idx) {
+                            final item = recipesForSelectedName[idx];
+                            final size = item['size'] ?? 'N/A';
+                            final recipeSteps = List<Map<String, dynamic>>.from(
+                              item['recipe'] ?? [],
+                            );
+
                             return GlassCard(
-                              child: ListTile(
-                                title: Text(step['rawName']?.toString() ?? ''),
-                                subtitle: Text(
-                                  'Ratio: ${(step['ratio'] as num?)?.toDouble() ?? 0.0}',
-                                ),
-                                trailing: isAdmin
-                                    ? IconButton(
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${item['name']} - Size: $size',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    if (recipeSteps.isEmpty)
+                                      const Text(
+                                        'No steps added for this size.',
+                                        style: TextStyle(
+                                          fontStyle: FontStyle.italic,
+                                          color: Colors.grey,
                                         ),
-                                        onPressed: () => _deleteRecipeStep(i),
                                       )
-                                    : null,
+                                    else
+                                      ...List.generate(recipeSteps.length, (i) {
+                                        final step = recipeSteps[i];
+                                        return ListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          title: Text(step['rawName'] ?? ''),
+                                          subtitle: Text(
+                                            'Ratio: ${(step['ratio'] as num?)?.toDouble() ?? 0.0}',
+                                          ),
+                                          trailing: isAdmin
+                                              ? IconButton(
+                                                  icon: const Icon(
+                                                    Icons.delete,
+                                                    color: Colors.red,
+                                                  ),
+                                                  onPressed: () =>
+                                                      _deleteRecipeStep(i),
+                                                )
+                                              : null,
+                                        );
+                                      }),
+                                  ],
+                                ),
                               ),
                             );
                           },

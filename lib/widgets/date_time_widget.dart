@@ -12,6 +12,7 @@ class DateTimeWidget extends StatefulWidget {
 
 class _DateTimeWidgetState extends State<DateTimeWidget> {
   late DateTime _currentTime;
+  bool _isExpanded = false; // Track if date is expanded
 
   @override
   void initState() {
@@ -41,9 +42,7 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
   @override
   Widget build(BuildContext context) {
     final dayName = DateFormat('EEEE').format(_currentTime); // e.g. Monday
-    final fullDate = DateFormat(
-      'dd MMMM yyyy',
-    ).format(_currentTime); // e.g. 17 June 2025
+    final fullDate = DateFormat('dd MMMM yyyy').format(_currentTime); // e.g. 17 September 2025
     final time = DateFormat('hh:mm a').format(_currentTime); // e.g. 07:35 PM
 
     return Center(
@@ -66,22 +65,43 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        fullDate,
-                        style: const TextStyle(fontSize: 16),
-                        overflow:
-                            TextOverflow.ellipsis, // adds "..." if too long
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isExpanded = !_isExpanded; // toggle expanded state
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                fullDate,
+                                style: const TextStyle(fontSize: 16),
+                                maxLines: _isExpanded ? null : 1,
+                                overflow: _isExpanded
+                                    ? TextOverflow.visible
+                                    : TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                           
+                          ],
+                        ),
                       ),
                     ),
                   ),
